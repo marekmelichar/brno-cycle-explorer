@@ -179,7 +179,7 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     expect((await renderedCounts(page))['omt:transportation'] ?? 0).toBeGreaterThan(100);
   });
 
-  test('example route: waypoints are geocoded positions; routing via Valhalla follows real roads', async ({ page }) => {
+  test('example route: waypoints are geocoded positions; routing engine (BRouter by default) follows real roads', async ({ page }) => {
     const errors = collectConsoleErrors(page);
     await page.goto('/');
     await waitForMapReady(page);
@@ -210,6 +210,16 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     expect(geom).toBeGreaterThan(200);
     await expect(page.getByTestId('route-stats')).toBeVisible();
     await page.waitForTimeout(1200);
+    // default engine BRouter: unverified sections are described with OSM data, clearly labelled
+    if (cfg.routing.defaultEngine === 'brouter') {
+      await expect(page.getByTestId('osm-breakdown')).toContainText('podle OpenStreetMap');
+      const osmRow = page.locator('[data-testid="analysis-panel"] tbody tr', { hasText: 'OSM:' }).first();
+      await expect(osmRow).toBeVisible();
+      await osmRow.click();
+      await expect(page.getByTestId('section-osm')).toContainText('highway=');
+      await expect(page.getByTestId('section-osm')).toContainText('Nejde o oficiální záznam');
+      await page.getByLabel('Zavřít detail úseku').click();
+    }
     await page.screenshot({ path: 'tests/screenshots/desktop-example-route.png' });
     // planned route export
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('planner-export').click()]);

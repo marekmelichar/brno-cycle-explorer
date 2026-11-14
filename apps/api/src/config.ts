@@ -11,8 +11,10 @@ export interface ApiConfig {
   arcgisBatchSize: number;
   refreshIntervalHours: number;
   refreshOnStartIfOlderThanHours: number;
-  routingProvider: 'valhalla' | 'none';
+  /** Enabled routing engines in order of preference (first = default); empty = routing off. */
+  routingEngines: Array<'brouter' | 'valhalla'>;
   valhallaUrl: string;
+  brouterUrl: string;
   routingTimeoutMs: number;
   geocoderUrl: string;
   geocoderUserAgent: string;
@@ -39,6 +41,17 @@ function num(v: string | undefined, d: number): number {
   return v !== undefined && v !== '' && Number.isFinite(n) ? n : d;
 }
 
+/**
+ * ROUTING_ENGINES="brouter,valhalla" (default; first = default engine). ROUTING_PROVIDER=none turns
+ * routing off; the older ROUTING_PROVIDER=valhalla keeps working as "valhalla only".
+ */
+export function parseEngines(env: NodeJS.ProcessEnv): Array<'brouter' | 'valhalla'> {
+  if (env.ROUTING_PROVIDER === 'none') return [];
+  const raw = env.ROUTING_ENGINES ?? (env.ROUTING_PROVIDER === 'valhalla' ? 'valhalla' : 'brouter,valhalla');
+  const list = raw.split(',').map((x) => x.trim()).filter((x): x is 'brouter' | 'valhalla' => x === 'brouter' || x === 'valhalla');
+  return [...new Set(list)];
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   let basemaps = DEFAULT_BASEMAPS;
   if (env.BASEMAP_STYLES) {
@@ -60,8 +73,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     arcgisBatchSize: num(env.ARCGIS_BATCH_SIZE, 500),
     refreshIntervalHours: num(env.DATA_REFRESH_INTERVAL_HOURS, 24),
     refreshOnStartIfOlderThanHours: num(env.DATA_REFRESH_ON_START_HOURS, 24),
-    routingProvider: env.ROUTING_PROVIDER === 'none' ? 'none' : 'valhalla',
+    routingEngines: parseEngines(env),
     valhallaUrl: (env.VALHALLA_URL ?? 'https://valhalla1.openstreetmap.de').replace(/\/$/, ''),
+    brouterUrl: (env.BROUTER_URL ?? 'https://brouter.de').replace(/\/$/, ''),
     routingTimeoutMs: num(env.ROUTING_TIMEOUT_MS, 30000),
     geocoderUrl: (env.GEOCODER_URL ?? 'https://nominatim.openstreetmap.org').replace(/\/$/, ''),
     geocoderUserAgent: env.GEOCODER_USER_AGENT ?? 'BrnoCycleExplorer/1.0 (self-hosted open-source app)',

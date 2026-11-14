@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig, HealthResponse } from '@bce/shared';
 import type { AppDeps } from '../app';
+import { MultiRoutingProvider } from '../adapters/routing/multi';
 
 const started = Date.now();
 
@@ -19,7 +20,14 @@ export function registerHealthRoutes(app: FastifyInstance, { config, infrastruct
   app.get('/api/config', async (): Promise<AppConfig> => ({
     basemaps: config.basemaps,
     defaultBasemap: config.defaultBasemap,
-    routing: { provider: routing.id, available: routing.available, description: routing.description, attribution: routing.attribution },
+    routing: {
+      provider: routing.id,
+      available: routing.available,
+      description: routing.description,
+      attribution: routing.attribution,
+      engines: routing instanceof MultiRoutingProvider ? routing.engineInfo : [],
+      defaultEngine: routing instanceof MultiRoutingProvider ? routing.defaultEngine : null,
+    },
     geocoding: { provider: geocoder ? 'nominatim' : 'none', available: !!geocoder, attribution: geocoder?.attribution ?? '' },
     infrastructureSource: config.arcgisLayerUrl,
   }));

@@ -8,6 +8,7 @@ import {
   type RideType,
   type RoutePreference,
   type RouteCandidate,
+  type OsmInterval,
 } from '@bce/shared';
 import { DEFAULT_MATCH_OPTIONS, type MatchOptions, type TrackPoint } from '@bce/geo';
 
@@ -28,6 +29,10 @@ export interface ActiveRoute {
   /** Elevation per vertex for GPX, or engine samples for calculated routes */
   elevations: Array<number | null> | null;
   meta?: Record<string, string | number>;
+  /** OSM way tags along a calculated route (BRouter), as engine-distance intervals. */
+  osm?: OsmInterval[] | null;
+  /** Route length as measured by the engine, to align OSM intervals with the analysis. */
+  engineDistance?: number;
 }
 
 export interface SavedRoute {
@@ -70,6 +75,8 @@ interface State {
   roundTrip: boolean;
   rideType: RideType;
   preference: RoutePreference;
+  /** Routing engine chosen in the planner (null = server default). */
+  engine: string | null;
   candidates: RouteCandidate[];
   selectedCandidateId: string | null;
   savedRoutes: SavedRoute[];
@@ -119,6 +126,7 @@ export const useAppStore = create<State>()(
       roundTrip: false,
       rideType: 'ebike',
       preference: 'max_paths',
+      engine: null,
       candidates: [],
       selectedCandidateId: null,
       savedRoutes: [],
@@ -176,6 +184,7 @@ export const useAppStore = create<State>()(
         matchOptions: s.matchOptions,
         rideType: s.rideType,
         preference: s.preference,
+        engine: s.engine,
         savedRoutes: s.savedRoutes,
       }),
       merge: (persisted, current) => {

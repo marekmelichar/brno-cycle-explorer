@@ -4,3 +4,4 @@ export * from './matching';
 export * from './stats';
 export * from './normalize';
 export * from './polyline';
+export * from './osm';

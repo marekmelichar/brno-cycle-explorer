@@ -60,7 +60,7 @@ export function useExportGpx() {
     let idx = 0;
     const ele = r.kind === 'gpx' ? r.elevations : null;
     const segments = r.lines.map((l) => l.map(([lon, lat]) => ({ lon, lat, ele: ele ? ele[idx++] ?? null : null })));
-    const kindLabel = r.kind === 'calculated' ? 'Vypočtená trasa (Valhalla, OSM)' : r.kind === 'manual' ? 'Ručně nakreslená trasa – nenavigovaná' : 'Importovaná GPX stopa';
+    const kindLabel = r.kind === 'calculated' ? `Vypočtená trasa (${r.meta?.variant ?? 'směrovač'}, data OSM)` : r.kind === 'manual' ? 'Ručně nakreslená trasa – nenavigovaná' : 'Importovaná GPX stopa';
     const xml = buildGpx({
       name: r.name,
       description: `${kindLabel}. Exportováno z Brno Cycle Explorer.`,

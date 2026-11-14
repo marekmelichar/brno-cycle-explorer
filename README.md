@@ -46,12 +46,20 @@ Web app for finding, viewing, analysing and planning bike routes in Brno. It use
   ("Not verified / no matching record"), never "road".
 - **Route planner**: click to add start, destination and stops. Points can be dragged, reordered
   and deleted. Supports round trips, ride type (Pohodová / Městská / E-bike / Sportovní) and route
-  preference (Maximum cyklostezek / Minimum silnic / Minimum převýšení / Nejkratší). Routes come
-  from **Valhalla** (bicycle profile) over the real OSM network. The app asks for several engine
-  variants and alternatives, then **scores** each one by matched infrastructure, distance and
-  climb, and lets you compare them. Manual drawing is clearly labelled "nenavigovaná trasa" (not
-  a navigable route). You can import a GPX as a starting point, export GPX, and save routes in
-  the browser.
+  preference (Maximum cyklostezek / Minimum silnic / Minimum převýšení / Nejkratší). Two routing
+  engines, both over the real OSM network, selectable in the planner ("Směrovač"):
+  - **BRouter** (default): custom variants of BRouter's trekking profile, changing only its
+    documented parameters (`avoid_unsafe`, `consider_traffic`, `consider_noise`, `consider_river`,
+    `uphillcost`, rider power for the time estimate), uploaded to the server, plus built-in
+    profiles (`safety`, `trekking`, `fastbike`, `shortest`) and alternatives. BRouter also returns
+    the **OSM tags of every way** on the route: sections with no municipal record are described
+    as e.g. "Neověřeno · OSM: klidná ulice, asfalt", and the planner shows the unverified length
+    by OSM way class. These are labelled as OSM data, never as official records.
+  - **Valhalla** (bicycle costing, several `use_roads`/`use_hills` variants and alternatives).
+
+  The app scores every candidate by matched infrastructure, distance and climb, and lets you
+  compare them. Manual drawing is clearly labelled "nenavigovaná trasa" (not a navigable route).
+  You can import a GPX as a starting point, export GPX, and save routes in the browser.
 - **Example route**: Maloměřice → Náplavka → Riviéra → Anthropos → Maloměřice. The waypoints
   were geocoded with Nominatim (`packages/shared/src/example-route.ts`); the connected route is
   calculated at runtime.
@@ -122,14 +130,21 @@ All settings are environment variables. See [.env.example](.env.example). Main o
 | `ARCGIS_LAYER_URL` | Brno FeatureServer layer 0 | Official data source |
 | `CACHE_DIR` | `./data-cache` | Dataset cache |
 | `DATA_REFRESH_INTERVAL_HOURS` | 24 | Automatic refresh |
-| `ROUTING_PROVIDER` | `valhalla` | `valhalla` or `none` |
-| `VALHALLA_URL` | `https://valhalla1.openstreetmap.de` | Routing server |
+| `ROUTING_ENGINES` | `brouter,valhalla` | Enabled engines, first = default (`ROUTING_PROVIDER=none` turns routing off) |
+| `BROUTER_URL` | `https://brouter.de` | BRouter server |
+| `VALHALLA_URL` | `https://valhalla1.openstreetmap.de` | Valhalla server |
 | `GEOCODER_URL` / `GEOCODER_USER_AGENT` | Nominatim | Search |
 | `BASEMAP_STYLES` | OpenFreeMap ×3 | JSON list of MapLibre styles |
 
 No API keys are needed for the basemap, the official data, routing or search.
 
 ### External routing dependency
+
+BRouter uses the **public brouter.de server** by default (no SLA, limited capacity; the app sends
+at most one request per ~1.1 s and caches uploaded profiles for 30 min). For production traffic,
+run BRouter yourself (Java; the Brno area needs the segment file `E15_N45.rd5`) and set
+`BROUTER_URL`. Valhalla stays available as the second engine.
+
 
 By default, automatic routing uses the **public FOSSGIS Valhalla instance**
 (`valhalla1.openstreetmap.de`). It has a fair-use policy and **no SLA**. If it is unreachable,
