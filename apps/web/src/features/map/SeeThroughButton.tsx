@@ -18,7 +18,7 @@ export function SeeThroughButton() {
 
   return (
     <ClickAwayListener onClickAway={() => setOpen(false)}>
-      <Box sx={{ position: 'absolute', right: 10, top: { xs: 190, sm: 152 }, zIndex: 3 }}>
+      <Box sx={{ position: 'absolute', right: 10, top: 152, zIndex: 3 }}>
         <ButtonBase
           onClick={() => setOpen(!open)}
           aria-label={`Průhlednost čar (neprůhlednost ${pct} %)`}

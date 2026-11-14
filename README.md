@@ -21,8 +21,8 @@ Web app for finding, viewing, analysing and planning bike routes in Brno. It use
   live service ([docs/NORMALIZATION.md](docs/NORMALIZATION.md)). Pictograms and lanes are **never**
   counted as separated paths.
 - **Map layers**: each category can be turned on or off. You can set opacity. Hovering highlights a
-  line and clicking shows its **original attributes**. The legend has line samples (colour + dash
-  pattern). The palette was checked for colour-blind safety.
+  line and clicking shows its **original attributes**. The layer list has line samples (colour +
+  dash pattern). The palette was checked for colour-blind safety.
 - **GPX analysis**: drag-and-drop or a file picker. Handles tracks and routes with several
   segments and skips corrupted points. Distance is geodesic (haversine). Climb and descent use
   hysteresis, and a reliability flag is shown. Every route section is coloured by its category and

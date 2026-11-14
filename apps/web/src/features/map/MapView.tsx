@@ -9,7 +9,6 @@ import { useAppStore } from '../../store/useAppStore';
 import { BRNO_CENTER } from '../../services/geometry';
 import { BLANK_STYLE, EMPTY_FC, INFRA_LAYER_IDS, ROUTE_LAYER_IDS, addOverlays, infraLayerId, setSourceData, type OverlayData } from './mapLayers';
 import { FeatureInspector } from './FeatureInspector';
-import { MapLegend } from './MapLegend';
 import { SeeThroughButton } from './SeeThroughButton';
 
 type StyleStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; message?: string };
@@ -425,7 +424,6 @@ export function MapView() {
       )}
 
       <FeatureInspector />
-      <MapLegend />
       <SeeThroughButton />
     </Box>
   );
