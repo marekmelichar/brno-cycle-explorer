@@ -1,0 +1,13 @@
+html, body, #root { height: 100%; margin: 0; }
+body { overscroll-behavior: none; }
+.bce-waypoint {
+  width: 26px; height: 26px; border-radius: 50%;
+  color: #fff; font: 700 12px/26px Inter, system-ui, sans-serif; text-align: center;
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5); cursor: grab;
+}
+.maplibregl-ctrl-attrib { font-size: 11px; }
+.maplibregl-ctrl-group button { width: 32px; height: 32px; }
+@media (max-width: 899px) {
+  .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: 92px; }
+}
+:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }

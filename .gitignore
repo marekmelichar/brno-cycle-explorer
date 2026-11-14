@@ -1,0 +1,10 @@
+node_modules
+dist
+.cache
+data-cache
+test-results
+playwright-report
+tests/screenshots/*.png
+!tests/screenshots/.gitkeep
+.env
+*.log

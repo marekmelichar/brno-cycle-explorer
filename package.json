@@ -1,0 +1,30 @@
+{
+  "name": "brno-cycle-explorer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,green \"npm run dev -w @bce/api\" \"npm run dev -w @bce/web\"",
+    "build": "npm run build -w @bce/api && npm run build -w @bce/web",
+    "start": "npm run start -w @bce/api",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/geo && tsc -p apps/api --noEmit && tsc -p apps/web --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test --trace off"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^26.6.6",
+    "@types/pngjs": "^6.0.5",
+    "@xmldom/xmldom": "^0.9.12",
+    "concurrently": "^10.0.7",
+    "pngjs": "^7.0.0",
+    "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
