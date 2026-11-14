@@ -43,7 +43,8 @@ import { SearchBox } from '../../components/SearchBox';
 import { GroupBar, RouteStats } from '../../components/RouteStats';
 import { useNotify } from '../../components/Notifier';
 import { useExportGpx } from '../../hooks/useRouteActions';
-import { fmtDuration, fmtKm, fmtPct } from '../../services/format';
+import { fmtDistance, fmtDuration, fmtKm, fmtPct } from '../../services/format';
+import { unverifiedOsmBreakdown } from '../../services/osm';
 import { linesBounds } from '../../services/geometry';
 
 const RIDE_TYPES: Array<{ id: RideType; label: string }> = [
@@ -73,6 +74,8 @@ export function PlannerPanel() {
   const { data: config } = useAppConfig();
   const index = useInfraIndex();
   const routingAvailable = !!config?.routing.available;
+  const engines = config?.routing.engines ?? [];
+  const engine = engines.some((e) => e.id === s.engine) ? s.engine : config?.routing.defaultEngine ?? null;
 
   const scored: Scored[] = useMemo(() => {
     const minDist = Math.min(...s.candidates.map((c) => c.distance));
@@ -88,7 +91,7 @@ export function PlannerPanel() {
   const selectCandidate = (c: RouteCandidate) => {
     s.set({
       selectedCandidateId: c.id,
-      activeRoute: { kind: 'calculated', name: 'Plánovaná trasa', lines: [c.coordinates], elevations: c.elevation, meta: { variant: c.variant } },
+      activeRoute: { kind: 'calculated', name: 'Plánovaná trasa', lines: [c.coordinates], elevations: c.elevation, meta: { variant: c.variant }, osm: c.osm ?? null, engineDistance: c.distance },
       selectedSectionId: null,
       analysisOpen: true,
     });
@@ -125,7 +128,7 @@ export function PlannerPanel() {
       notify('Zadejte alespoň start a cíl (kliknutím do mapy).', 'info');
       return;
     }
-    routeMut.mutate({ waypoints: wps.map((w) => w.position), rideType: s.rideType, preference: s.preference, roundTrip: s.roundTrip });
+    routeMut.mutate({ waypoints: wps.map((w) => w.position), rideType: s.rideType, preference: s.preference, roundTrip: s.roundTrip, engine: engine ?? undefined });
   };
 
   const loadExample = () => {
@@ -160,6 +163,7 @@ export function PlannerPanel() {
   };
 
   const selected = scored.find((x) => x.c.id === s.selectedCandidateId);
+  const osmBreakdown = s.activeRoute?.kind === 'calculated' ? unverifiedOsmBreakdown(s.activeRoute, selected?.analysis ?? null) : null;
   const manualActive = s.activeRoute?.kind === 'manual';
 
   return (
@@ -192,6 +196,18 @@ export function PlannerPanel() {
               Trasy počítá {config.routing.description} po skutečné síti silnic a cest z OpenStreetMap. Výsledky se poté hodnotí podle přiřazené oficiální
               infrastruktury.
             </Typography>
+          )}
+          {engines.length > 1 && (
+            <FormControl size="small" fullWidth>
+              <InputLabel id="engine">Směrovač</InputLabel>
+              <Select labelId="engine" label="Směrovač" value={engine ?? ''} onChange={(e) => s.set({ engine: e.target.value, candidates: [] })} data-testid="engine-select">
+                {engines.map((e) => (
+                  <MenuItem key={e.id} value={e.id}>
+                    {e.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           )}
           <Stack direction="row" spacing={1}>
             <FormControl size="small" fullWidth>
@@ -372,6 +388,27 @@ export function PlannerPanel() {
 
       {selected?.analysis && s.activeRoute?.kind === 'calculated' && (
         <RouteStats analysis={selected.analysis} elevation={selected.c.elevation ? elevationStats(selected.c.elevation) : null} compact />
+      )}
+
+      {osmBreakdown && osmBreakdown.length > 0 && (
+        <Box data-testid="osm-breakdown">
+          <Typography variant="overline" color="text.secondary">
+            Neověřené úseky podle OpenStreetMap
+          </Typography>
+          {osmBreakdown.map((b) => (
+            <Box key={b.cls} sx={{ display: 'flex', fontSize: 13 }}>
+              <Typography variant="body2" sx={{ flex: 1 }}>
+                {b.label}
+              </Typography>
+              <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                {fmtDistance(b.length)}
+              </Typography>
+            </Box>
+          ))}
+          <Typography variant="caption" color="text.secondary">
+            Úseky bez záznamu města, popsané podle dat OSM z vypočtené trasy (BRouter). Nejde o oficiální data.
+          </Typography>
+        </Box>
       )}
 
       {s.savedRoutes.length > 0 && (

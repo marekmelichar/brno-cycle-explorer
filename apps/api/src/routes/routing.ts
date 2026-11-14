@@ -17,6 +17,7 @@ const schema = {
       rideType: { type: 'string', enum: ['leisure', 'urban', 'ebike', 'sport'] },
       preference: { type: 'string', enum: ['max_paths', 'min_roads', 'min_climb', 'shortest'] },
       roundTrip: { type: 'boolean' },
+      engine: { type: 'string', enum: ['brouter', 'valhalla'] },
     },
   },
 } as const;

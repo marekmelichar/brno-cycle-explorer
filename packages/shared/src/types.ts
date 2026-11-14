@@ -72,10 +72,24 @@ export interface BasemapStyle {
   attribution?: string;
 }
 
+export interface RoutingEngineInfo {
+  id: string;
+  label: string;
+  description: string;
+  attribution: string;
+}
+
 export interface AppConfig {
   basemaps: BasemapStyle[];
   defaultBasemap: string;
-  routing: { provider: string; available: boolean; description: string; attribution: string };
+  routing: {
+    provider: string;
+    available: boolean;
+    description: string;
+    attribution: string;
+    engines: RoutingEngineInfo[];
+    defaultEngine: string | null;
+  };
   geocoding: { provider: string; available: boolean; attribution: string };
   infrastructureSource: string;
 }
@@ -88,6 +102,15 @@ export interface RouteRequest {
   rideType: RideType;
   preference: RoutePreference;
   roundTrip?: boolean;
+  /** Routing engine id (e.g. "brouter", "valhalla"); defaults to the server's default engine. */
+  engine?: string;
+}
+
+/** OSM tags of the ways a calculated route uses, as distance intervals along that route (metres). */
+export interface OsmInterval {
+  from: number;
+  to: number;
+  tags: Record<string, string>;
 }
 
 export interface RouteCandidate {
@@ -101,6 +124,8 @@ export interface RouteCandidate {
   distance: number;
   duration: number;
   provider: string;
+  /** OSM way tags along the route (BRouter only); null when the engine does not report them. */
+  osm?: OsmInterval[] | null;
 }
 
 export interface RouteResponse {

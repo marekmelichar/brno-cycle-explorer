@@ -5,6 +5,8 @@ import { FileCache } from './cache/file-cache';
 import { InfrastructureService } from './services/infrastructure-service';
 import { NoRoutingProvider, type RoutingProvider } from './adapters/routing/types';
 import { ValhallaProvider } from './adapters/routing/valhalla';
+import { BrouterProvider } from './adapters/routing/brouter';
+import { MultiRoutingProvider } from './adapters/routing/multi';
 import { NominatimGeocoder } from './adapters/geocoding/nominatim';
 import pino from 'pino';
 
@@ -18,8 +20,10 @@ const client = new ArcGisClient({
   log,
 });
 const infrastructure = new InfrastructureService(client, new FileCache(config.cacheDir, 'infrastructure'), config.arcgisLayerUrl, log);
-const routing: RoutingProvider =
-  config.routingProvider === 'valhalla' ? new ValhallaProvider(config.valhallaUrl, config.routingTimeoutMs) : new NoRoutingProvider();
+const engines = config.routingEngines.map((e) =>
+  e === 'brouter' ? new BrouterProvider(config.brouterUrl, config.routingTimeoutMs) : new ValhallaProvider(config.valhallaUrl, config.routingTimeoutMs),
+);
+const routing: RoutingProvider = engines.length ? new MultiRoutingProvider(engines) : new NoRoutingProvider();
 const geocoder = config.geocoderEnabled ? new NominatimGeocoder(config.geocoderUrl, config.geocoderUserAgent) : null;
 
 const app = await buildApp({ config, infrastructure, routing, geocoder });

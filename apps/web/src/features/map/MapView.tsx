@@ -9,6 +9,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { BRNO_CENTER } from '../../services/geometry';
 import { BLANK_STYLE, EMPTY_FC, INFRA_LAYER_IDS, ROUTE_LAYER_IDS, addOverlays, infraLayerId, setSourceData, type OverlayData } from './mapLayers';
 import { FeatureInspector } from './FeatureInspector';
+import { sectionLabel } from '../../services/osm';
 import { SeeThroughButton } from './SeeThroughButton';
 
 type StyleStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; message?: string };
@@ -45,6 +46,7 @@ export function MapView() {
   const { data: config, error: configError, refetch: refetchConfig } = useAppConfig();
   const { data: infra } = useInfrastructure();
   const analysis = useActiveAnalysis();
+  const activeRoute = useAppStore((s) => s.activeRoute);
 
   const basemapId = useAppStore((s) => s.basemapId);
   const visible = useAppStore((s) => s.visibleCategories);
@@ -74,7 +76,7 @@ export function MapView() {
           features: analysis.sections.map((s) => ({
             type: 'Feature',
             id: s.id,
-            properties: { sectionId: s.id, category: s.category ?? 'unmatched', color: s.category ? CATEGORIES[s.category].color : UNMATCHED_COLOR, label: s.label },
+            properties: { sectionId: s.id, category: s.category ?? 'unmatched', color: s.category ? CATEGORIES[s.category].color : UNMATCHED_COLOR, label: sectionLabel(activeRoute, analysis, s) },
             geometry: { type: 'LineString', coordinates: s.coordinates },
           })),
         }
@@ -98,7 +100,7 @@ export function MapView() {
       },
       selectedSection: sel ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: sel.coordinates } }] } : EMPTY_FC,
     };
-  }, [analysis, infra, candidates, selectedCandidateId, manualLine, selectedSectionId]);
+  }, [analysis, activeRoute, infra, candidates, selectedCandidateId, manualLine, selectedSectionId]);
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
 
@@ -171,7 +173,7 @@ export function MapView() {
         compact: true,
         customAttribution: [
           'Cykloopatření: © <a href="https://data.brno.cz" target="_blank" rel="noreferrer">Statutární město Brno</a>',
-          'Trasy: Valhalla / OSM',
+          'Trasy: BRouter / Valhalla, data © OpenStreetMap',
         ],
       }),
       'bottom-right',

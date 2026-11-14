@@ -22,15 +22,18 @@ import { useAppStore } from '../../store/useAppStore';
 import { fmtDistance, fmtKm, fmtPct } from '../../services/format';
 import { GroupBar, QualityChip } from '../../components/RouteStats';
 import { linesBounds } from '../../services/geometry';
+import { sectionLabel, sectionOsm } from '../../services/osm';
 
-const KIND_LABEL = { gpx: 'Importovaná GPX stopa', calculated: 'Vypočtená trasa (Valhalla / OSM)', manual: 'Ručně nakreslená trasa (nenavigovaná)' } as const;
+const KIND_LABEL = { gpx: 'Importovaná GPX stopa', calculated: 'Vypočtená trasa (OSM)', manual: 'Ručně nakreslená trasa (nenavigovaná)' } as const;
 
 export function SectionDetail() {
   const analysis = useActiveAnalysis();
   const id = useAppStore((s) => s.selectedSectionId);
   const set = useAppStore((s) => s.set);
+  const active = useAppStore((s) => s.activeRoute);
   const sec = analysis?.sections.find((s) => s.id === id);
   if (!sec || !analysis) return null;
+  const osm = sectionOsm(active, analysis, sec);
   const pieces = analysis.pieces.filter((p) => p.startDistance >= sec.startDistance - 0.01 && p.startDistance < sec.startDistance + sec.length - 0.01);
   const cands = new Map<number, { cat: string; reason?: string; d: number; a: number; acc: boolean }>();
   for (const p of pieces) for (const c of p.candidates) if (!cands.has(c.featureId)) cands.set(c.featureId, { cat: CATEGORIES[c.category].label, reason: c.rejectReason, d: c.distance, a: c.angle, acc: c.accepted });
@@ -54,6 +57,22 @@ export function SectionDetail() {
       <Typography variant="body2" sx={{ mt: 0.5, fontSize: 12.5 }}>
         Proč: {sec.reasons[0]}
       </Typography>
+      {osm && (
+        <Box sx={{ mt: 0.75, p: 1, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.04)' }} data-testid="section-osm">
+          <Typography variant="caption" component="div" sx={{ fontWeight: 600 }}>
+            OpenStreetMap: {osm.text}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" component="div" sx={{ fontFamily: 'monospace', wordBreak: 'break-word' }}>
+            {Object.entries(osm.tags)
+              .filter(([k]) => !/^(reversedirection|estimated_)/.test(k))
+              .map(([k, v]) => `${k}=${v}`)
+              .join(' · ')}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" component="div">
+            Data OSM z vypočtené trasy (BRouter){osm.share < 0.9 ? `, pokrývá ${Math.round(osm.share * 100)} % úseku` : ''}. Nejde o oficiální záznam města.
+          </Typography>
+        </Box>
+      )}
       {cands.size > 0 && (
         <Box sx={{ mt: 0.5 }}>
           <Typography variant="caption" color="text.secondary">
@@ -94,7 +113,7 @@ export function AnalysisPanel() {
         <Typography variant="subtitle2" noWrap sx={{ maxWidth: 260 }}>
           {active.name}
         </Typography>
-        <Chip size="small" variant="outlined" label={KIND_LABEL[active.kind]} />
+        <Chip size="small" variant="outlined" label={active.kind === 'calculated' && active.meta?.variant ? `Vypočtená trasa · ${String(active.meta.variant).split(':')[0]}` : KIND_LABEL[active.kind]} />
         {analysis ? (
           <>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -154,7 +173,7 @@ export function AnalysisPanel() {
                     <TableCell sx={{ py: 0.25 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Box sx={{ width: 10, height: 10, borderRadius: '2px', bgcolor: s.category ? CATEGORIES[s.category].color : UNMATCHED_COLOR, flexShrink: 0 }} />
-                        {s.label}
+                        {sectionLabel(active, analysis, s)}
                       </Box>
                     </TableCell>
                     <TableCell align="right" sx={{ py: 0.25, fontVariantNumeric: 'tabular-nums' }}>{fmtKm(s.startDistance)}</TableCell>

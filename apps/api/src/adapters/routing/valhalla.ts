@@ -23,25 +23,25 @@ export function variantsFor(pref: RoutePreference, ride: RideType): Variant[] {
   switch (pref) {
     case 'max_paths':
       return [
-        { label: 'Valhalla use_roads=0.0', options: { use_roads: 0.0, use_hills: hills } },
-        { label: 'Valhalla use_roads=0.15', options: { use_roads: 0.15, use_hills: hills } },
-        { label: 'Valhalla use_roads=0.35', options: { use_roads: 0.35, use_hills: hills } },
+        { label: 'Valhalla: use_roads=0.0', options: { use_roads: 0.0, use_hills: hills } },
+        { label: 'Valhalla: use_roads=0.15', options: { use_roads: 0.15, use_hills: hills } },
+        { label: 'Valhalla: use_roads=0.35', options: { use_roads: 0.35, use_hills: hills } },
       ];
     case 'min_roads':
       return [
-        { label: 'Valhalla use_roads=0.05, use_living_streets=0.8', options: { use_roads: 0.05, use_living_streets: 0.8, use_hills: hills } },
-        { label: 'Valhalla use_roads=0.2', options: { use_roads: 0.2, use_hills: hills } },
+        { label: 'Valhalla: use_roads=0.05, use_living_streets=0.8', options: { use_roads: 0.05, use_living_streets: 0.8, use_hills: hills } },
+        { label: 'Valhalla: use_roads=0.2', options: { use_roads: 0.2, use_hills: hills } },
       ];
     case 'min_climb':
       return [
-        { label: 'Valhalla use_hills=0.0', options: { use_roads: 0.25, use_hills: 0.0 } },
-        { label: 'Valhalla use_hills=0.15', options: { use_roads: 0.15, use_hills: 0.15 } },
+        { label: 'Valhalla: use_hills=0.0', options: { use_roads: 0.25, use_hills: 0.0 } },
+        { label: 'Valhalla: use_hills=0.15', options: { use_roads: 0.15, use_hills: 0.15 } },
       ];
     case 'shortest':
     default:
       return [
-        { label: 'Valhalla shortest=true', options: { use_roads: 0.5, use_hills: 1.0 }, shortest: true },
-        { label: 'Valhalla use_roads=0.5', options: { use_roads: 0.5, use_hills: hills } },
+        { label: 'Valhalla: shortest=true', options: { use_roads: 0.5, use_hills: 1.0 }, shortest: true },
+        { label: 'Valhalla: use_roads=0.5', options: { use_roads: 0.5, use_hills: hills } },
       ];
   }
 }
