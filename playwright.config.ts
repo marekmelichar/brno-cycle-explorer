@@ -13,6 +13,9 @@ export default defineConfig({
     baseURL: WEB,
     trace: 'off',
     acceptDownloads: true,
+    // Optional: reuse a pre-installed Chromium (e.g. Claude Code cloud sessions) instead of
+    // the browser downloaded by `npx playwright install`.
+    launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
   projects: [
     { name: 'desktop-chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 }, testIgnore: /mobile\.spec\.ts/ },

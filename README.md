@@ -79,6 +79,9 @@ into `apps/api/data-cache/`.
 Windows 11: works in PowerShell and in WSL2. Paths are never hardcoded; the cache folder is
 configurable (`CACHE_DIR`). macOS and Linux work the same way.
 
+Claude Code cloud sessions need a proxy flag and an allowlisted environment. See
+[docs/CLOUD_SESSIONS.md](docs/CLOUD_SESSIONS.md).
+
 ## Production (Docker Compose)
 
 ```bash
