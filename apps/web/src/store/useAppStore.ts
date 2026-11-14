@@ -52,6 +52,8 @@ interface State {
   basemapId: string | null;
   visibleCategories: Record<InfraCategory, boolean>;
   infraOpacity: number;
+  /** See-through mode: all overlay lines drawn semi-transparent so the basemap shows through. */
+  seeThrough: boolean;
   showInfra: boolean;
   selectedFeatureId: number | null;
   hoverFeatureId: number | null;
@@ -102,6 +104,7 @@ export const useAppStore = create<State>()(
       basemapId: null,
       visibleCategories: defaultVisible,
       infraOpacity: 0.9,
+      seeThrough: false,
       showInfra: true,
       selectedFeatureId: null,
       hoverFeatureId: null,
@@ -168,6 +171,7 @@ export const useAppStore = create<State>()(
         basemapId: s.basemapId,
         visibleCategories: s.visibleCategories,
         infraOpacity: s.infraOpacity,
+        seeThrough: s.seeThrough,
         matchOptions: s.matchOptions,
         rideType: s.rideType,
         preference: s.preference,

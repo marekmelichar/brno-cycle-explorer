@@ -10,6 +10,7 @@ import { BRNO_CENTER } from '../../services/geometry';
 import { BLANK_STYLE, EMPTY_FC, INFRA_LAYER_IDS, ROUTE_LAYER_IDS, addOverlays, infraLayerId, setSourceData, type OverlayData } from './mapLayers';
 import { FeatureInspector } from './FeatureInspector';
 import { MapLegend } from './MapLegend';
+import { SeeThroughButton } from './SeeThroughButton';
 
 type StyleStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; message?: string };
 
@@ -50,6 +51,7 @@ export function MapView() {
   const visible = useAppStore((s) => s.visibleCategories);
   const showInfra = useAppStore((s) => s.showInfra);
   const opacity = useAppStore((s) => s.infraOpacity);
+  const seeThrough = useAppStore((s) => s.seeThrough);
   const selectedFeatureId = useAppStore((s) => s.selectedFeatureId);
   const selectedSectionId = useAppStore((s) => s.selectedSectionId);
   const waypoints = useAppStore((s) => s.waypoints);
@@ -105,14 +107,23 @@ export function MapView() {
     const map = mapRef.current;
     if (!map || !map.getLayer(infraLayerId('separated_path'))) return;
     const s = useAppStore.getState();
+    // See-through mode lowers every overlay so roads and their names show through the lines.
+    const k = s.seeThrough ? 0.4 : 1;
+    const infraOpacity = s.infraOpacity * k;
     for (const c of CATEGORY_ORDER) {
       const id = infraLayerId(c);
       map.setLayoutProperty(id, 'visibility', s.showInfra && s.visibleCategories[c] ? 'visible' : 'none');
-      map.setPaintProperty(id, 'line-opacity', s.infraOpacity);
+      map.setPaintProperty(id, 'line-opacity', infraOpacity);
     }
+    map.setPaintProperty('bce-route-casing', 'line-opacity', 0.85 * (s.seeThrough ? 0.25 : 1));
+    map.setPaintProperty('bce-route-matched', 'line-opacity', s.seeThrough ? 0.5 : 1);
+    map.setPaintProperty('bce-route-unmatched', 'line-opacity', s.seeThrough ? 0.5 : 1);
+    map.setPaintProperty('bce-candidates', 'line-opacity', 0.55 * k);
+    map.setPaintProperty('bce-route-selected', 'line-opacity', 0.6 * (s.seeThrough ? 0.35 : 1));
+    map.setPaintProperty('bce-infra-selected', 'line-opacity', 0.75 * (s.seeThrough ? 0.35 : 1));
     const visibleCats = CATEGORY_ORDER.filter((c) => s.showInfra && s.visibleCategories[c] && c !== 'not_infrastructure');
     map.setFilter('bce-infra-casing', ['in', ['get', 'category'], ['literal', visibleCats]]);
-    map.setPaintProperty('bce-infra-casing', 'line-opacity', 0.45 * s.infraOpacity);
+    map.setPaintProperty('bce-infra-casing', 'line-opacity', 0.45 * infraOpacity * (s.seeThrough ? 0.5 : 1));
     map.setFilter('bce-infra-selected', ['==', ['get', 'id'], s.selectedFeatureId ?? -1]);
   }, []);
 
@@ -211,7 +222,7 @@ export function MapView() {
     setSourceData(map, 'bce-selected-section', overlay.selectedSection);
   }, [overlay.route, overlay.candidates, overlay.manual, overlay.selectedSection, mapReady]);
 
-  useEffect(applyLayerState, [visible, showInfra, opacity, selectedFeatureId, mapReady, applyLayerState]);
+  useEffect(applyLayerState, [visible, showInfra, opacity, seeThrough, selectedFeatureId, mapReady, applyLayerState]);
 
   // ---------- waypoint markers (draggable) ----------
   useEffect(() => {
@@ -414,6 +425,7 @@ export function MapView() {
 
       <FeatureInspector />
       <MapLegend />
+      <SeeThroughButton />
     </Box>
   );
 }

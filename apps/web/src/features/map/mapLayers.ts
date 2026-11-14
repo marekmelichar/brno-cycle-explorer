@@ -34,8 +34,11 @@ export function addOverlays(map: MlMap, data: OverlayData) {
   src('bce-manual', data.manual);
   src('bce-selected-section', data.selectedSection);
 
+  // Insert every overlay BELOW the basemap's first label layer, so street names, road numbers and
+  // place labels stay readable on top of the cycling lines.
+  const firstLabel = map.getStyle().layers.find((l) => l.type === 'symbol')?.id;
   const add = (layer: Parameters<MlMap['addLayer']>[0]) => {
-    if (!map.getLayer(layer.id)) map.addLayer(layer);
+    if (!map.getLayer(layer.id)) map.addLayer(layer, firstLabel);
   };
 
   add({
