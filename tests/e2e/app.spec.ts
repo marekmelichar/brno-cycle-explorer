@@ -100,14 +100,23 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     expect(order.firstLabel).toBeGreaterThan(0);
     expect(order.lastOverlay).toBeLessThan(order.firstLabel);
 
-    // see-through toggle makes route and infrastructure lines semi-transparent, and back
+    // transparency slider: user-set opacity applies to route and infrastructure lines
+    const routeOpacity = () => page.evaluate(() => (window as any).__bceMap.getPaintProperty('bce-route-matched', 'line-opacity'));
     await page.getByTestId('see-through-button').click();
-    await expect.poll(() => page.evaluate(() => (window as any).__bceMap.getPaintProperty('bce-route-matched', 'line-opacity'))).toBe(0.5);
-    expect(await page.evaluate(() => (window as any).__bceMap.getPaintProperty('bce-infra-shared_path', 'line-opacity'))).toBeLessThan(0.5);
+    const slider = page.getByTestId('opacity-panel').getByRole('slider');
+    await slider.focus();
+    await page.keyboard.press('Home');
+    await expect.poll(routeOpacity).toBeCloseTo(0.15, 5);
+    expect(await page.evaluate(() => (window as any).__bceMap.getPaintProperty('bce-infra-shared_path', 'line-opacity'))).toBeLessThan(0.2);
+    for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight');
+    await expect.poll(routeOpacity).toBeCloseTo(0.45, 5);
+    await expect(page.getByTestId('opacity-panel')).toContainText('45 %');
     await page.waitForTimeout(600);
     await page.screenshot({ path: 'tests/screenshots/desktop-see-through.png' });
+    await page.keyboard.press('End');
+    await expect.poll(routeOpacity).toBe(1);
     await page.getByTestId('see-through-button').click();
-    await expect.poll(() => page.evaluate(() => (window as any).__bceMap.getPaintProperty('bce-route-matched', 'line-opacity'))).toBe(1);
+    await expect(page.getByTestId('opacity-panel')).toBeHidden();
 
     // 11: export GPX and validate XML
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-gpx').click()]);

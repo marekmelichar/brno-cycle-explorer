@@ -52,8 +52,8 @@ interface State {
   basemapId: string | null;
   visibleCategories: Record<InfraCategory, boolean>;
   infraOpacity: number;
-  /** See-through mode: all overlay lines drawn semi-transparent so the basemap shows through. */
-  seeThrough: boolean;
+  /** Opacity multiplier for ALL overlay lines (route, infrastructure, highlights): 0.15–1, set by the map slider. */
+  overlayOpacity: number;
   showInfra: boolean;
   selectedFeatureId: number | null;
   hoverFeatureId: number | null;
@@ -104,7 +104,7 @@ export const useAppStore = create<State>()(
       basemapId: null,
       visibleCategories: defaultVisible,
       infraOpacity: 0.9,
-      seeThrough: false,
+      overlayOpacity: 1,
       showInfra: true,
       selectedFeatureId: null,
       hoverFeatureId: null,
@@ -160,18 +160,19 @@ export const useAppStore = create<State>()(
       fitTo: (bounds) => set({ fitRequest: { bounds, at: Date.now() } }),
       saveRoute: (r) => set((s) => ({ savedRoutes: [r, ...s.savedRoutes.filter((x) => x.id !== r.id)].slice(0, 10) })),
       deleteSavedRoute: (id) => set((s) => ({ savedRoutes: s.savedRoutes.filter((x) => x.id !== id) })),
-      resetSettings: () => set({ matchOptions: DEFAULT_MATCH_OPTIONS, visibleCategories: defaultVisible, infraOpacity: 0.9, showInfra: true }),
+      resetSettings: () => set({ matchOptions: DEFAULT_MATCH_OPTIONS, visibleCategories: defaultVisible, infraOpacity: 0.9, showInfra: true, overlayOpacity: 1 }),
     }),
     {
       name: 'bce-settings-v1',
-      version: 2,
+      version: 3,
       // v2 changed the default matching tolerance – drop old matching options, keep the rest
-      migrate: (persisted) => ({ ...(persisted as object), matchOptions: undefined }) as unknown as State,
+      migrate: (persisted, version) =>
+        ({ ...(persisted as object), ...(version < 2 ? { matchOptions: undefined } : {}), seeThrough: undefined }) as unknown as State,
       partialize: (s) => ({
         basemapId: s.basemapId,
         visibleCategories: s.visibleCategories,
         infraOpacity: s.infraOpacity,
-        seeThrough: s.seeThrough,
+        overlayOpacity: s.overlayOpacity,
         matchOptions: s.matchOptions,
         rideType: s.rideType,
         preference: s.preference,
