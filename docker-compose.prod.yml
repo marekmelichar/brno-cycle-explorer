@@ -1,7 +1,7 @@
-# Production stack on the Contabo VPS: compose project "cyklo" in /opt/cyklo, served at
+# Production stack on the Contabo VPS: compose project "cyklo" in /home/deploy/cyklo, served at
 # https://cyklo.nettio.eu by edge-nginx (nettio-platform repo, nginx/sites/cyklo.conf).
 # Deployed by GitHub Actions through a restricted key; the server-side hook writes IMAGE_TAG
-# (the commit sha) into /opt/cyklo/.env. Images are public on ghcr.io (no registry login).
+# (the commit sha) into ~/cyklo/.env. Images are public on ghcr.io (no registry login).
 name: cyklo
 
 services:
