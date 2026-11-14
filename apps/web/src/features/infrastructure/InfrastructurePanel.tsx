@@ -18,7 +18,7 @@ import {
 import RefreshIcon from '@mui/icons-material/Refresh';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { CATEGORIES, CATEGORY_ORDER } from '@bce/shared';
+import { CATEGORIES, CATEGORY_ORDER, UNMATCHED_LABEL } from '@bce/shared';
 import { useDatasetStats, useImportInfrastructure, useInfrastructure, useRefreshInfrastructure } from '../../hooks/data';
 import { useAppStore } from '../../store/useAppStore';
 import { fmtDate, fmtDateTime, fmtInt, fmtKm } from '../../services/format';
@@ -173,6 +173,15 @@ export function InfrastructurePanel() {
           );
         })}
       </Stack>
+      <Box data-testid="route-colour-note" sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, pl: 0.5 }}>
+        <svg width={28} height={10} aria-hidden="true" style={{ flexShrink: 0, marginTop: 4 }}>
+          <line x1={1} y1={5} x2={27} y2={5} stroke="#0b1220" strokeWidth={7} />
+          <line x1={1} y1={5} x2={27} y2={5} stroke="#f1f5f9" strokeWidth={4} strokeDasharray="5 4" />
+        </svg>
+        <Typography variant="caption" color="text.secondary">
+          Úseky naplánované nebo importované trasy mají barvu kategorie, po které vedou. Bílé čárkování = {UNMATCHED_LABEL}.
+        </Typography>
+      </Box>
       <Box>
         <Typography variant="caption" color="text.secondary" id="opacity-label">
           Průhlednost vrstev: {Math.round(opacity * 100)} %

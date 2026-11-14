@@ -55,7 +55,8 @@ Expected: `"status":"ok"` with `featureCount` around 700. If you get `degraded` 
 - **Preview pane:** Claude reports port 5173 to the app and the page opens in the side panel.
   Your own browser fetches the basemap tiles, so it works even without `tiles.openfreemap.org`.
 - **Screenshot:** ask Claude for "a screenshot of the app". It renders the page with the
-  pre-installed Chromium and sends you the PNG.
+  pre-installed Chromium. It can send you the PNG only in sessions that support sending files
+  (e.g. project threads); otherwise it can look at the screenshot and describe it.
 
 ## Recipe 4: tests
 
@@ -82,7 +83,7 @@ Tested in a cloud session on 2026-11-14: 56/56 unit tests and 5/5 e2e tests pass
 | `curl: (56) CONNECT tunnel failed, response 403` | Host is not in the environment's allowlist | Add the host to the environment. |
 | Grey map + "Mapový podklad se nepodařilo načíst" in a screenshot | `tiles.openfreemap.org` not allowed | Add the host. This doesn't affect the preview pane. |
 | Playwright: `Executable doesn't exist … npx playwright install` | Downloading browsers is blocked | Set `PW_CHROMIUM_PATH=/opt/pw-browsers/chromium`. Don't run `playwright install`. |
-| Port 5173 already in use (`strictPort`) | An earlier dev server is still running | `pkill -f vite; pkill -f "tsx watch"`, then start again. |
+| Port 5173 already in use (`strictPort`) | An earlier dev server is still running | `pkill -f "[v]ite"; pkill -f "[t]sx watch"`, then start again. The brackets matter: a plain `pkill -f vite` run by Claude also matches and kills its own shell. |
 | Everything was fine, now it's gone | The container is recycled after inactivity | Run Recipe 2 again. Data re-downloads in about 2 s. |
 
 ## Quick reference
