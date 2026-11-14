@@ -59,7 +59,7 @@ export function MapLegend() {
       <Paper
         data-testid="map-legend"
         elevation={4}
-        sx={{ position: 'absolute', right: 10, bottom: 36, zIndex: 2, px: 1.25, py: 0.75, maxWidth: 270, display: { xs: 'none', sm: 'block' } }}
+        sx={{ position: 'absolute', right: 10, bottom: 36, zIndex: 2, px: 1.25, py: 0.75, maxWidth: 270, maxHeight: 'calc(100% - 240px)', overflowY: 'auto', display: { xs: 'none', sm: 'block' } }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Typography variant="overline" sx={{ flex: 1, lineHeight: 1.6 }}>

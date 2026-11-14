@@ -90,6 +90,25 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     await page.waitForTimeout(900);
     await page.screenshot({ path: 'tests/screenshots/desktop-gpx-analysis.png' });
 
+    // street names stay readable: every overlay sits below the basemap's first label layer
+    const order = await page.evaluate(() => {
+      const layers = (window as any).__bceMap.getStyle().layers as Array<{ id: string; type: string }>;
+      const firstLabel = layers.findIndex((l) => l.type === 'symbol');
+      const lastOverlay = Math.max(...layers.map((l, i) => (l.id.startsWith('bce-') ? i : -1)));
+      return { firstLabel, lastOverlay };
+    });
+    expect(order.firstLabel).toBeGreaterThan(0);
+    expect(order.lastOverlay).toBeLessThan(order.firstLabel);
+
+    // see-through toggle makes route and infrastructure lines semi-transparent, and back
+    await page.getByTestId('see-through-button').click();
+    await expect.poll(() => page.evaluate(() => (window as any).__bceMap.getPaintProperty('bce-route-matched', 'line-opacity'))).toBe(0.5);
+    expect(await page.evaluate(() => (window as any).__bceMap.getPaintProperty('bce-infra-shared_path', 'line-opacity'))).toBeLessThan(0.5);
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: 'tests/screenshots/desktop-see-through.png' });
+    await page.getByTestId('see-through-button').click();
+    await expect.poll(() => page.evaluate(() => (window as any).__bceMap.getPaintProperty('bce-route-matched', 'line-opacity'))).toBe(1);
+
     // 11: export GPX and validate XML
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-gpx').click()]);
     const xml = readFileSync((await download.path())!, 'utf8');
