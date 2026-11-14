@@ -1,0 +1,80 @@
+name: Build and Deploy
+
+# Every push to main is a production deploy to https://cyklo.nettio.eu (Contabo VPS).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/marekmelichar/brno-cycle-explorer
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  build:
+    needs: tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        image: [api, web]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: apps/${{ matrix.image }}/Dockerfile
+          push: true
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      # The key can only run ~/deploy-hooks/cyklo-deploy-hook.sh on the VPS (forced command, no shell).
+      # The hook accepts nothing but "deploy <sha>", checks that the sha is the current head of main,
+      # fetches that commit's docker-compose.prod.yml from GitHub itself, validates and deploys.
+      # Source: VPS-manager repo, remote/cyklo-deploy-hook.sh. Images are public on ghcr.io.
+      - name: Deploy to VPS
+        env:
+          DEPLOY_KEY: ${{ secrets.CYKLO_DEPLOY_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo '62.84.190.4 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAqY4PyGvspZYfzpUqDSZEifChq/FBI5J4EtOUU4AyNT' > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$HOME/.ssh/known_hosts" \
+            deploy@62.84.190.4 "deploy ${GITHUB_SHA}"
+          rm -f ~/.ssh/deploy_key
+
+      - name: Check the live site
+        run: |
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS https://cyklo.nettio.eu/api/health | grep -q '"status":"ok"'; then break; fi
+            sleep 10
+          done
+          curl -fsS -o /dev/null https://cyklo.nettio.eu/
+          curl -fsS https://cyklo.nettio.eu/api/health
