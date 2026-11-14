@@ -96,6 +96,20 @@ static server that proxies `/api` to it (see `apps/web/nginx.conf`).
 
 Works with Docker Desktop + WSL2 on Windows, Docker Desktop on macOS and Docker Engine on Linux.
 
+## Live deployment (cyklo.nettio.eu)
+
+Production runs at **https://cyklo.nettio.eu** on the nettio.eu VPS:
+
+- Every push to `main` runs `.github/workflows/deploy.yml`: the test suite (`tests.yml`), then builds and
+  pushes the public images `ghcr.io/marekmelichar/brno-cycle-explorer/{api,web}:<sha>`, then deploys.
+- The deploy uses a restricted SSH key (secret `CYKLO_DEPLOY_KEY`). The server only accepts
+  `deploy <sha>` for the current head of `main`, fetches `docker-compose.prod.yml` from GitHub itself and
+  runs it as compose project `cyklo` with `IMAGE_TAG=<sha>`.
+- `cyklo-web` joins the shared `edge` network. The platform's edge-nginx (separate repo) terminates TLS
+  for `cyklo.nettio.eu` and proxies to it. The app sends its own Content-Security-Policy (see
+  `apps/web/nginx.conf`).
+- Pull requests run the unit tests and the Playwright browser tests (`tests.yml`).
+
 ## Configuration
 
 All settings are environment variables. See [.env.example](.env.example). Main ones:

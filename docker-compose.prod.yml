@@ -1,0 +1,53 @@
+# Production stack on the Contabo VPS: compose project "cyklo" in /home/deploy/cyklo, served at
+# https://cyklo.nettio.eu by edge-nginx (nettio-platform repo, nginx/sites/cyklo.conf).
+# Deployed by GitHub Actions through a restricted key; the server-side hook writes IMAGE_TAG
+# (the commit sha) into ~/cyklo/.env. Images are public on ghcr.io (no registry login).
+name: cyklo
+
+services:
+  api:
+    image: ghcr.io/marekmelichar/brno-cycle-explorer/api:${IMAGE_TAG:?set IMAGE_TAG}
+    container_name: cyklo-api
+    restart: always
+    environment:
+      API_PORT: "3001"
+      CACHE_DIR: /data
+      LOG_LEVEL: info
+      CORS_ORIGIN: https://cyklo.nettio.eu
+      GEOCODER_USER_AGENT: "BrnoCycleExplorer/1.0 (+https://cyklo.nettio.eu)"
+    volumes:
+      - cyklo_cache:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  web:
+    image: ghcr.io/marekmelichar/brno-cycle-explorer/web:${IMAGE_TAG:?set IMAGE_TAG}
+    container_name: cyklo-web
+    restart: always
+    environment:
+      API_UPSTREAM: http://cyklo-api:3001
+    depends_on:
+      - api
+    networks:
+      default: {}
+      edge:
+        aliases: [cyklo-web]
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  cyklo_cache:
+    name: cyklo_cache_data
+
+networks:
+  edge:
+    external: true
