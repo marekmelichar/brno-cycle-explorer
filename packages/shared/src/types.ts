@@ -114,6 +114,11 @@ export interface RouteRequest {
   roundTrip?: boolean;
   /** Routing engine id (e.g. "brouter", "valhalla"); defaults to the server's default engine. */
   engine?: string;
+  /**
+   * Desired loop length (m). With roundTrip and a single waypoint (the start), the server plans
+   * loops of about this length in several directions instead of a point-to-point route.
+   */
+  targetDistance?: number;
 }
 
 /** OSM tags of the ways a calculated route uses, as distance intervals along that route (metres). */
@@ -127,9 +132,11 @@ export interface RouteCandidate {
   id: string;
   /** Description of how the candidate was produced (e.g. engine parameters), Czech */
   variant: string;
-  /** Language-neutral variant id (e.g. "brouter.pleasant") and alternative number, for translation */
+  /** Language-neutral variant id (e.g. "brouter.pleasant", "loop.n") and alternative number, for translation */
   variantCode?: string;
   alternative?: number;
+  /** For planned loops: the requested length (m) */
+  targetDistance?: number;
   coordinates: LngLat[];
   /** Elevation profile samples (m), if the engine provided them */
   elevation: number[] | null;

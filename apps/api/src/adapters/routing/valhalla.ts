@@ -116,6 +116,22 @@ export class ValhallaProvider implements RoutingProvider {
     });
   }
 
+  async routeOnce(points: LngLat[], req: Pick<RouteRequest, 'rideType' | 'preference'>): Promise<RouteCandidate> {
+    const v = variantsFor(req.preference, req.rideType)[0];
+    const [t] = await this.call(points, req.rideType, v, 0);
+    if (!t) throw new RoutingError('Směrovací server nevrátil trasu.', 422);
+    return {
+      id: 'once',
+      variant: v.label,
+      coordinates: t.coords,
+      elevation: t.elevation,
+      elevationInterval: t.interval,
+      distance: t.distance,
+      duration: t.duration,
+      provider: this.id,
+    };
+  }
+
   async route(req: RouteRequest): Promise<RouteResponse> {
     const pts = [...req.waypoints];
     if (req.roundTrip && pts.length >= 2) pts.push(pts[0]);
