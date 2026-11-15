@@ -447,6 +447,8 @@ export const cs = {
     loopHintOne: "S jedním bodem (start) navrhnu okruhy této délky do čtyř směrů.",
     loopHintMany: "Délka okruhu se použije, když necháte jen startovní bod.",
     loopTarget: "cíl {{km}}",
+    retry: "Zkusit znovu",
+    interrupted: "Spojení se přerušilo (např. při přepnutí aplikace). Trasa se přepočítá, až se vrátíte.",
   },
   wp: {
     start: "S",

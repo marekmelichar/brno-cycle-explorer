@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   Alert,
@@ -38,7 +38,7 @@ import ClearAllIcon from '@mui/icons-material/ClearAll';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { EXAMPLE_ROUTE, type RideType, type RouteCandidate, type RoutePreference, type RouteResponse } from '@bce/shared';
 import { analyzeRoute, elevationStats, scoreRoute, type RouteAnalysis, type RouteScore } from '@bce/geo';
-import { api, apiErrorText } from '../../services/api';
+import { api, ApiError, apiErrorText } from '../../services/api';
 import { engineLabel, enginesDescription, variantLabel } from '../../services/variant';
 import { useAppConfig, useInfraIndex } from '../../hooks/data';
 import { newWaypointId, useAppStore } from '../../store/useAppStore';
@@ -146,9 +146,37 @@ export function PlannerPanel() {
         engine: engine ?? undefined,
         ...(loop ? { targetDistance: s.targetKm * 1000 } : {}),
       },
-      { onSuccess: (res) => handleRouteResult(res, fit), onError: (e) => notify(apiErrorText(e, t), 'error') },
+      {
+        onSuccess: (res) => handleRouteResult(res, fit),
+        onError: (e) => {
+          const retry = { label: t('planner.retry'), onClick: () => calculate(useAppStore.getState().waypoints, fit) };
+          if (e instanceof ApiError && (e.code === 'network' || e.code === 'timeout')) {
+            // Phones drop requests when the browser goes to the background: recalculate on return.
+            interruptedRef.current = true;
+            notify(t('planner.interrupted'), 'warning', retry);
+          } else {
+            notify(apiErrorText(e, t), 'error', retry);
+          }
+        },
+      },
     );
   };
+
+  // After a dropped connection, recalculate as soon as the page is visible again.
+  const interruptedRef = useRef(false);
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || !interruptedRef.current) return;
+      interruptedRef.current = false;
+      useAppStore.getState().set({ routeDirty: true });
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onVisible);
+    };
+  }, []);
 
   // Automatic (re)calculation once there are two points, whenever points or options change.
   useEffect(() => {
