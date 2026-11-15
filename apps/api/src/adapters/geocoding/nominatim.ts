@@ -55,8 +55,14 @@ export class NominatimGeocoder {
     });
   }
 
-  search(q: string): Promise<GeocodeResult[]> {
-    const key = q.trim().toLowerCase();
+  /**
+   * Worldwide search, biased (not limited) to `viewbox` = [minLon, minLat, maxLon, maxLat] (the
+   * visible map; Brno by default), results in `lang`.
+   */
+  search(q: string, opts: { viewbox?: [number, number, number, number]; lang?: 'cs' | 'en' } = {}): Promise<GeocodeResult[]> {
+    const vb = opts.viewbox ?? [16.35, 49.05, 16.85, 49.35];
+    const lang = opts.lang ?? 'cs';
+    const key = `${lang}|${vb.map((v) => v.toFixed(1)).join(',')}|${q.trim().toLowerCase()}`;
     const hit = this.cache.get(key);
     if (hit && Date.now() - hit.at < 24 * 3.6e6) return Promise.resolve(hit.results);
     return this.enqueue(async () => {
@@ -64,10 +70,9 @@ export class NominatimGeocoder {
         q,
         format: 'jsonv2',
         limit: '8',
-        countrycodes: 'cz',
-        viewbox: '16.35,49.35,16.85,49.05',
+        viewbox: `${vb[0]},${vb[3]},${vb[2]},${vb[1]}`,
         bounded: '0',
-        'accept-language': 'cs',
+        'accept-language': lang,
       });
       const res = await this.fetchFn(`${this.baseUrl}/search?${params}`, {
         headers: { 'User-Agent': this.userAgent, Accept: 'application/json' },

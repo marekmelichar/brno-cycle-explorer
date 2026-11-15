@@ -43,6 +43,15 @@ export interface InfraFeatureCollection {
   features: InfraFeature[];
 }
 
+/** Language-neutral warnings about the downloaded / imported dataset. */
+export type DataWarning =
+  | { code: 'mercator_converted' }
+  | { code: 'missing_fields'; fields: string[] }
+  | { code: 'skipped_no_geometry'; count: number }
+  | { code: 'no_geojson_support' }
+  | { code: 'unexpected_geometry'; type: string }
+  | { code: 'partial'; received: number; expected: number };
+
 export interface DatasetMeta {
   source: 'official' | 'imported' | 'none';
   sourceUrl: string;
@@ -53,8 +62,9 @@ export interface DatasetMeta {
   lastRefreshed: string | null;
   /** Latest value of datum_exportu in the records */
   latestExportDate: string | null;
-  lastError: { message: string; at: string } | null;
-  schemaWarnings: string[];
+  lastError: { message: string; at: string; code?: 'data_unavailable' } | null;
+  /** Data-quality notes about the source (codes; plain strings only in caches written before 15 Nov 2026) */
+  schemaWarnings: Array<DataWarning | string>;
   distinctTypes: Array<{ value: string | null; count: number; category: InfraCategory }>;
   refreshing: boolean;
 }
@@ -115,8 +125,11 @@ export interface OsmInterval {
 
 export interface RouteCandidate {
   id: string;
-  /** Description of how the candidate was produced (e.g. engine parameters) */
+  /** Description of how the candidate was produced (e.g. engine parameters), Czech */
   variant: string;
+  /** Language-neutral variant id (e.g. "brouter.pleasant") and alternative number, for translation */
+  variantCode?: string;
+  alternative?: number;
   coordinates: LngLat[];
   /** Elevation profile samples (m), if the engine provided them */
   elevation: number[] | null;

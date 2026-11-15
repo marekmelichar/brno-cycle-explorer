@@ -112,7 +112,8 @@ export interface RouteScore {
   score: number;
   infraShare: number;
   comfort: number;
-  explanation: string;
+  /** Which weighting was used (language-neutral key: max_paths | min_roads | min_climb | min_climb_no_elev | shortest) */
+  explanation: 'max_paths' | 'min_roads' | 'min_climb' | 'min_climb_no_elev' | 'shortest';
 }
 
 /**
@@ -138,24 +139,24 @@ export function scoreRoute(
   const climbPerKm = opts.elevationGain != null ? opts.elevationGain / (total / 1000) : null;
 
   let score: number;
-  let explanation: string;
+  let explanation: RouteScore['explanation'];
   switch (preference) {
     case 'max_paths':
       score = 70 * comfort + 30 * sepShare - 20 * Math.max(0, detour - 0.3);
-      explanation = 'Váha: komfort dle typu infrastruktury 70 %, podíl stezek mimo vozovku 30 %, penalizace objížďky nad 30 %.';
+      explanation = 'max_paths';
       break;
     case 'min_roads':
       score = 60 * infraShare + 40 * comfort - 20 * Math.max(0, detour - 0.3);
-      explanation = 'Váha: podíl úseků se záznamem cykloopatření 60 %, komfort 40 %. Neověřené úseky snižují skóre (nejde o měření provozu).';
+      explanation = 'min_roads';
       break;
     case 'min_climb':
       score = 100 - Math.min(100, (climbPerKm ?? 0) * 5) * 0.7 + 30 * comfort - 30;
-      explanation = climbPerKm == null ? 'Převýšení není k dispozici – hodnoceno jen podle komfortu.' : 'Váha: převýšení na km 70 %, komfort 30 %.';
+      explanation = climbPerKm == null ? 'min_climb_no_elev' : 'min_climb';
       break;
     case 'shortest':
     default:
       score = 100 - 100 * Math.min(1, detour) * 0.8 + 20 * comfort - 20;
-      explanation = 'Váha: délka trasy 80 %, komfort 20 %.';
+      explanation = 'shortest';
   }
   return { score: Math.max(0, Math.min(100, score)), infraShare, comfort, explanation };
 }

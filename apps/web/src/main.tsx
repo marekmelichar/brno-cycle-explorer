@@ -8,6 +8,7 @@ import '@fontsource/inter/700.css';
 import './styles.css';
 import { theme } from './theme';
 import { App } from './App';
+import './i18n';
 import { NotifierProvider } from './components/Notifier';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } });

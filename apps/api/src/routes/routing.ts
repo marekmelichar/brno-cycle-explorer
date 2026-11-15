@@ -27,7 +27,7 @@ export function registerRoutingRoutes(app: FastifyInstance, { routing }: AppDeps
     for (const [lon, lat] of req.body.waypoints) {
       if (!(lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90)) {
         reply.status(400);
-        return { error: 'Neplatné souřadnice bodu trasy.' };
+        return { error: 'Neplatné souřadnice bodu trasy.', code: 'invalid' };
       }
     }
     try {
@@ -35,7 +35,11 @@ export function registerRoutingRoutes(app: FastifyInstance, { routing }: AppDeps
     } catch (e) {
       const status = e instanceof RoutingError ? e.statusCode : 502;
       reply.status(status);
-      return { error: e instanceof Error ? e.message : String(e) };
+      return {
+        error: e instanceof Error ? e.message : String(e),
+        code: e instanceof RoutingError ? e.code : 'routing_unavailable',
+        ...(e instanceof RoutingError && e.detail ? { detail: e.detail } : {}),
+      };
     }
   });
 }

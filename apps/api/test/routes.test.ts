@@ -86,6 +86,19 @@ describe('REST API', () => {
     expect(r.json().error).toMatch(/No path/);
   });
 
+  it('geocode searches worldwide, biased to the visible map, in the UI language', async () => {
+    const seen: string[] = [];
+    const g = new NominatimGeocoder('https://nominatim.test', 'test', async (url: string) => {
+      seen.push(url);
+      return new Response('[]');
+    });
+    await g.search('Paris', { viewbox: [2.2, 48.8, 2.4, 48.9], lang: 'en' });
+    expect(seen[0]).not.toContain('countrycodes');
+    expect(seen[0]).toContain('viewbox=2.2%2C48.9%2C2.4%2C48.8');
+    expect(seen[0]).toContain('bounded=0');
+    expect(seen[0]).toContain('accept-language=en');
+  });
+
   it('geocode validates query length and returns normalized results', async () => {
     const { server } = await app();
     expect((await server.inject('/api/geocode?q=ab')).statusCode).toBe(400);

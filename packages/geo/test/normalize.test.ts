@@ -68,7 +68,8 @@ describe('infrastructure normalization', () => {
     expect(r.skipped).toBe(2);
     expect(r.features[0].geometry.coordinates[0]).toEqual([expect.closeTo(16.6066, 3), expect.closeTo(49.18, 1)]);
     expect(r.features[1].id).not.toBe(3); // duplicate id replaced
-    expect(r.warnings.join(' ')).toMatch(/Mercator/);
+    expect(r.warnings).toContainEqual({ code: 'mercator_converted' });
+    expect(r.warnings).toContainEqual({ code: 'skipped_no_geometry', count: 2 });
   });
   it('rejects non-FeatureCollection input', () => {
     expect(() => normalizeInfrastructure({ foo: 1 }, 'imported')).toThrow();

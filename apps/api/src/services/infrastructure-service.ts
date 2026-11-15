@@ -1,4 +1,4 @@
-import type { DatasetMeta, InfraFeatureCollection, InfrastructureResponse } from '@bce/shared';
+import type { DataWarning, DatasetMeta, InfraFeatureCollection, InfrastructureResponse } from '@bce/shared';
 import { normalizeInfrastructure } from '@bce/geo';
 import { ArcGisClient } from '../adapters/brno-gis/arcgis-client';
 import { FileCache } from '../cache/file-cache';
@@ -22,7 +22,7 @@ export interface Logger {
 export class InfrastructureService {
   private current: CachedDataset | null = null;
   private refreshPromise: Promise<CachedDataset> | null = null;
-  private lastError: { message: string; at: string } | null = null;
+  private lastError: { message: string; at: string; code: 'data_unavailable' } | null = null;
 
   constructor(
     private readonly client: ArcGisClient,
@@ -82,8 +82,8 @@ export class InfrastructureService {
         const norm = normalizeInfrastructure(res.featureCollection, 'official');
         const expectedFields = ['typ_opatreni', 'rok_realizace', 'delka', 'datum_exportu'];
         const missing = expectedFields.filter((f) => !res.metadata.fields.some((x) => x.name === f));
-        const schemaWarnings = [...res.warnings, ...norm.warnings];
-        if (missing.length) schemaWarnings.push(`Metadata vrstvy neobsahují pole: ${missing.join(', ')}`);
+        const schemaWarnings: DataWarning[] = [...res.warnings, ...norm.warnings];
+        if (missing.length) schemaWarnings.push({ code: 'missing_fields', fields: missing });
         if (norm.features.length === 0) throw new Error('Služba nevrátila žádné platné prvky.');
         const ds: CachedDataset = {
           meta: {
@@ -107,7 +107,7 @@ export class InfrastructureService {
         return ds;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        this.lastError = { message, at: new Date().toISOString() };
+        this.lastError = { message, at: new Date().toISOString(), code: 'data_unavailable' };
         this.log.error({ err: message }, 'Infrastructure refresh failed');
         throw err;
       } finally {

@@ -48,14 +48,19 @@ describe('GPX parsing', () => {
     expect(g.stats.trackCount).toBe(1);
     expect(g.stats.routeCount).toBe(1);
     expect(g.waypoints).toHaveLength(1);
-    expect(g.warnings.join(' ')).toMatch(/neplatných bodů/);
-    expect(g.warnings.join(' ')).toMatch(/jediným platným bodem/);
+    expect(g.warnings).toContainEqual({ code: 'invalid_points', count: 2 });
+    expect(g.warnings).toContainEqual({ code: 'single_point_segment' });
   });
 
   it('rejects non-GPX and empty input with a typed error', () => {
     expect(() => parseGpx('', xmlParser)).toThrow(GpxParseError);
-    expect(() => parseGpx('<kml></kml>', xmlParser)).toThrow(/gpx/);
-    expect(() => parseGpx('<gpx><trk><trkseg></trkseg></trk></gpx>', xmlParser)).toThrow(/žádnou trasu/);
+    expect(() => parseGpx('<kml></kml>', xmlParser)).toThrow('not_gpx');
+    expect(() => parseGpx('<gpx><trk><trkseg></trkseg></trk></gpx>', xmlParser)).toThrow('no_track');
+    try {
+      parseGpx('<a', xmlParser);
+    } catch (e) {
+      expect((e as GpxParseError).code).toBe('invalid_xml');
+    }
   });
 
   it('round-trips through buildGpx', () => {
