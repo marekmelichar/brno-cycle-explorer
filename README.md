@@ -64,6 +64,17 @@ Web app for finding, viewing, analysing and planning bike routes in Brno. It use
   The app scores every candidate by matched infrastructure, distance and climb, and lets you
   compare them. Manual drawing is clearly labelled "nenavigovaná trasa" (not a navigable route).
   You can import a GPX as a starting point, export GPX, and save routes in the browser.
+- **Share a route link:** "Sdílet odkaz" (Share link) puts the plan into the URL: the points
+  (5 decimals ≈ 1 m), their names, ride type, preference, engine, and round trip with its loop
+  length, e.g. `?wp=16.6,49.195;16.612,49.2&n=Start|Cíl&ride=ebike`. It sends the plan, not the
+  geometry: whoever opens the link gets the route recalculated on the current network. Phones open
+  the system share sheet; desktops copy the link. Invalid links are ignored, and the parameters are
+  removed from the address bar after loading (`packages/shared/src/share-link.ts`).
+- **Start from my location:** the location button next to the planner search makes the device
+  position the start (high accuracy, 15 s timeout). Pressing it again replaces that start instead of
+  adding a point, and the point is named after the nearest street. Blocked access, no signal and
+  timeouts each show their own message. Needs HTTPS; production allows it via
+  `Permissions-Policy: geolocation=(self)`.
 - **Example route**: Maloměřice → Náplavka → Riviéra → Anthropos → Maloměřice. The waypoints
   were geocoded with Nominatim (`packages/shared/src/example-route.ts`); the connected route is
   calculated at runtime.

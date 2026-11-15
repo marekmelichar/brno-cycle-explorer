@@ -20,6 +20,7 @@ import { useAppStore, type SidebarTab } from './store/useAppStore';
 import { useGpxImport } from './hooks/useRouteActions';
 import { useActiveAnalysis } from './hooks/data';
 import { RouteSummaryBar } from './components/RouteSummaryBar';
+import { useSharedPlanImport } from './hooks/usePlanSharing';
 
 const TABS: Array<{ id: SidebarTab; label: string; short: string; icon: ReactNode }> = [
   { id: 'map', label: 'tabs.map', short: 'tabs.mapShort', icon: <MapIcon fontSize="small" /> },
@@ -115,6 +116,7 @@ export function App() {
     document.documentElement.style.setProperty('--bce-sheet-peek', `${peekHeight}px`);
   }, [peekHeight]);
   const drop = useWindowDrop();
+  useSharedPlanImport();
 
   return (
     <Box sx={{ height: '100dvh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default', overflow: 'hidden' }}>
