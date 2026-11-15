@@ -138,6 +138,8 @@ export function App() {
               transition: 'height .25s ease',
               borderTopLeftRadius: 16,
               borderTopRightRadius: 16,
+              borderBottomLeftRadius: 0,
+              borderBottomRightRadius: 0,
               display: 'flex',
               flexDirection: 'column',
               zIndex: 4,
