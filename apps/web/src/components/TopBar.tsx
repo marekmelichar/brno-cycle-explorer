@@ -12,7 +12,7 @@ import { useAppConfig, useRefreshInfrastructure } from '../hooks/data';
 import { useAppStore } from '../store/useAppStore';
 import { useExportGpx, useGpxImport } from '../hooks/useRouteActions';
 import { SearchBox } from './SearchBox';
-import { useNotify } from './Notifier';
+import { notifyPromise, useNotify } from './Notifier';
 
 export function TopBar() {
   const { data: config } = useAppConfig();
@@ -81,10 +81,11 @@ export function TopBar() {
               aria-label="Obnovit data"
               disabled={refresh.isPending}
               onClick={() =>
-                refresh.mutate(undefined, {
-                  onSuccess: (d) => notify(`Data obnovena: ${d.meta.featureCount} prvků.`, 'success'),
-                  onError: (e) => notify(`Obnovení selhalo: ${(e as Error).message}`, 'error'),
-                })
+                notifyPromise(refresh.mutateAsync(), {
+                  loading: 'Stahuji data z ArcGIS služby města…',
+                  success: (d) => `Data obnovena: ${d.meta.featureCount} prvků.`,
+                  error: (e) => `Obnovení selhalo: ${(e as Error).message}`,
+                }).catch(() => undefined)
               }
             >
               {refresh.isPending ? <CircularProgress size={20} color="inherit" /> : <RefreshIcon />}

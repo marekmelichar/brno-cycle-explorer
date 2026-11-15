@@ -206,7 +206,7 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     }
     const res = await Promise.race([
       page.getByTestId('candidates').waitFor({ timeout: 90_000 }).then(() => 'ok'),
-      page.getByTestId('notification').filter({ hasText: /Směrovací server|nedostupn/ }).waitFor({ timeout: 90_000 }).then(() => 'error'),
+      page.locator('[data-sonner-toast]').filter({ hasText: /Směrovací server|nedostupn/ }).waitFor({ timeout: 90_000 }).then(() => 'error'),
     ]);
     if (res === 'error') {
       test.info().annotations.push({ type: 'limitation', description: 'Public Valhalla routing server unavailable during test' });

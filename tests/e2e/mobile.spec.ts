@@ -21,6 +21,11 @@ test('mobile layout: full-screen map with bottom sheet', async ({ page }) => {
   await expect(page.getByTestId('route-colour-note')).toContainText('Neověřeno');
   await page.getByTestId('tab-gpx').click();
   await page.getByTestId('gpx-input').setInputFiles('tests/fixtures/rullerovo-riviera.gpx');
+  // Sonner toast confirms the import, below the top bar (not covering it)
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: 'Načtena trasa' });
+  await expect(toast).toBeVisible();
+  expect((await toast.boundingBox())!.y).toBeGreaterThanOrEqual(52);
+  await page.screenshot({ path: 'tests/screenshots/mobile-toast.png' });
   await page.getByRole('button', { name: 'Rozbalit panel', exact: true }).click({ timeout: 10_000 });
   await expect(page.getByTestId('route-total').first()).toBeVisible();
   await page.waitForTimeout(1000);
