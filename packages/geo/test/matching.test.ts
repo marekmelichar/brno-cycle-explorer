@@ -48,7 +48,7 @@ describe('route ↔ infrastructure matching', () => {
     const idx = new InfraIndex([feature(path, C8)]);
     const a = analyzeRoute([eastLine(0, 300, 0, 30)], idx);
     expect(share(a, 'separated_path')).toBe(0);
-    const crossing = a.pieces.filter((x) => x.candidates.some((c) => /směr|souběh/.test(c.rejectReason ?? '')) || /Krátký/.test(x.reason));
+    const crossing = a.pieces.filter((x) => x.candidates.some((c) => c.reject?.code === 'angle' || c.reject?.code === 'overlap') || x.reason.code === 'short_run');
     expect(crossing.length).toBeGreaterThan(0);
   });
 
@@ -57,7 +57,7 @@ describe('route ↔ infrastructure matching', () => {
     const idx = new InfraIndex([feature(path, C9)]);
     const a = analyzeRoute([eastLine(0, 300, 0, 30)], idx);
     expect(share(a, 'shared_path')).toBe(0);
-    expect(a.pieces.some((p) => /Krátký souběh/.test(p.reason))).toBe(true);
+    expect(a.pieces.some((p) => p.reason.code === 'short_run')).toBe(true);
     // with suppression disabled the contact is visible
     const raw = analyzeRoute([eastLine(0, 300, 0, 30)], idx, { minRunLength: 0 });
     expect(share(raw, 'shared_path')).toBeGreaterThan(0);
@@ -126,7 +126,7 @@ describe('route ↔ infrastructure matching', () => {
     const idx = new InfraIndex([feature(eastLine(0, 300), C8)]);
     const far: LngLat[] = [[14.42, 50.08], [14.43, 50.085]]; // Prague
     const a = analyzeRoute([far], idx);
-    expect(a.pieces[0].reason).toMatch(/Mimo území/);
+    expect(a.pieces[0].reason).toEqual({ code: 'outside' });
     expect(a.quality.outsideCoverageShare).toBe(1);
   });
 });
@@ -159,13 +159,13 @@ describe('gap bridging', () => {
     const idx = new InfraIndex([feature(eastLine(0, 150), C9), feature(eastLine(158, 150), C9)]);
     const a = analyzeRoute([eastLine(0, 300, 1, 30)], idx, { maxGapFill: 10 });
     expect(share(a, 'shared_path')).toBeGreaterThan(0.99);
-    expect(a.pieces.some((p) => /Krátká mezera/.test(p.reason) && p.confidence === 'medium')).toBe(true);
+    expect(a.pieces.some((p) => p.reason.code === 'gap' && p.confidence === 'medium')).toBe(true);
     const noFill = analyzeRoute([eastLine(0, 300, 1, 30)], idx, { maxGapFill: 0 });
     expect(share(noFill, 'unmatched')).toBeGreaterThan(0);
   });
   it('does not bridge between different classes or long gaps', () => {
     const idx = new InfraIndex([feature(eastLine(0, 150), C9), feature(eastLine(158, 150), V14), feature(eastLine(400, 100), V14)]);
     const a = analyzeRoute([eastLine(0, 500, 1, 50)], idx, { maxGapFill: 10 });
-    expect(a.pieces.filter((p) => /Krátká mezera/.test(p.reason))).toHaveLength(0);
+    expect(a.pieces.filter((p) => p.reason.code === 'gap')).toHaveLength(0);
   });
 });

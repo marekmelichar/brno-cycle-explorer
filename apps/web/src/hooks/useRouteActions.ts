@@ -3,19 +3,21 @@ import { buildGpx, parseGpx, GpxParseError } from '@bce/geo';
 import { useAppStore, type ActiveRoute } from '../store/useAppStore';
 import { downloadText, linesBounds, safeFileName } from '../services/geometry';
 import { useNotify } from '../components/Notifier';
+import { useI18n } from '../i18n';
 
 const MAX_GPX_BYTES = 25 * 1024 * 1024;
 
 export function useGpxImport() {
   const notify = useNotify();
+  const { t } = useI18n();
   return useCallback(
     async (file: File) => {
       if (file.size > MAX_GPX_BYTES) {
-        notify('Soubor je příliš velký (max. 25 MB).', 'error');
+        notify(t('gpx.tooBig'), 'error');
         return false;
       }
       if (!/\.gpx$/i.test(file.name) && file.type !== 'application/gpx+xml') {
-        notify('Očekáván soubor .gpx.', 'warning');
+        notify(t('gpx.expectGpx'), 'warning');
       }
       try {
         const text = await file.text();
@@ -37,10 +39,10 @@ export function useGpxImport() {
         });
         const b = linesBounds(lines);
         if (b) s.fitTo(b);
-        notify(`Načtena trasa „${route.name}“ (${parsed.stats.validPointCount} bodů).`, 'success');
+        notify(t('gpx.loaded', { name: route.name, count: parsed.stats.validPointCount }), 'success');
         return true;
       } catch (e) {
-        notify(e instanceof GpxParseError ? `GPX nelze načíst: ${e.message}` : 'Soubor se nepodařilo načíst.', 'error');
+        notify(e instanceof GpxParseError ? t('gpx.cannotLoad', { reason: t(`gpx.err.${e.code}`) }) : t('gpx.readFailed'), 'error');
         return false;
       }
     },
@@ -50,24 +52,25 @@ export function useGpxImport() {
 
 export function useExportGpx() {
   const notify = useNotify();
+  const { t } = useI18n();
   return useCallback(() => {
     const s = useAppStore.getState();
     const r = s.activeRoute;
     if (!r) {
-      notify('Není co exportovat – nejprve načtěte GPX nebo naplánujte trasu.', 'info');
+      notify(t('export.nothing'), 'info');
       return;
     }
     let idx = 0;
     const ele = r.kind === 'gpx' ? r.elevations : null;
     const segments = r.lines.map((l) => l.map(([lon, lat]) => ({ lon, lat, ele: ele ? ele[idx++] ?? null : null })));
-    const kindLabel = r.kind === 'calculated' ? `Vypočtená trasa (${r.meta?.variant ?? 'směrovač'}, data OSM)` : r.kind === 'manual' ? 'Ručně nakreslená trasa – nenavigovaná' : 'Importovaná GPX stopa';
+    const kindLabel = r.kind === 'calculated' ? t('export.calculated', { variant: r.meta?.variant ?? t('export.router') }) : r.kind === 'manual' ? t('export.manual') : t('export.gpx');
     const xml = buildGpx({
       name: r.name,
-      description: `${kindLabel}. Exportováno z Brno Cycle Explorer.`,
+      description: t('export.desc', { kind: kindLabel }),
       segments,
       waypoints: r.kind !== 'gpx' ? s.waypoints.map((w) => ({ name: w.name, lon: w.position[0], lat: w.position[1] })) : undefined,
     });
     downloadText(`${safeFileName(r.name)}.gpx`, xml);
-    notify('GPX soubor byl vygenerován.', 'success');
-  }, [notify]);
+    notify(t('export.done'), 'success');
+  }, [notify, t]);
 }

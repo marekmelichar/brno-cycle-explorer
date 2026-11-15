@@ -30,7 +30,7 @@ describe('ArcGIS adapter', () => {
     const m = mockArcGis({ count: 1000, dropIds: [5] });
     const res = await client(m.fetchFn, 500).fetchAll();
     expect(res.featureCollection.features).toHaveLength(999);
-    expect(res.warnings.join(' ')).toMatch(/999 z 1000/);
+    expect(res.warnings).toContainEqual({ code: 'partial', received: 999, expected: 1000 });
   });
 
   it('fails loudly on a substantially incomplete response', async () => {

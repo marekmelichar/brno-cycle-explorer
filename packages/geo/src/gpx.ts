@@ -23,10 +23,23 @@ export interface ParsedGpx {
     routeCount: number;
     elevationCoverage: number;
   };
-  warnings: string[];
+  warnings: GpxWarning[];
 }
 
-export class GpxParseError extends Error {}
+export type GpxErrorCode = 'no_parser' | 'empty' | 'invalid_xml' | 'not_gpx' | 'no_track';
+
+/** Thrown for documents that are not usable GPX at all; `code` is language-neutral. */
+export class GpxParseError extends Error {
+  constructor(readonly code: GpxErrorCode) {
+    super(code);
+  }
+}
+
+export type GpxWarning =
+  | { code: 'single_point_segment' }
+  | { code: 'invalid_points'; count: number }
+  | { code: 'no_elevation' }
+  | { code: 'partial_elevation' };
 
 interface DomParserLike {
   parseFromString(s: string, type: string): Document;
@@ -35,7 +48,7 @@ interface DomParserLike {
 function getParser(parser?: DomParserLike): DomParserLike {
   if (parser) return parser;
   const g = globalThis as unknown as { DOMParser?: new () => DomParserLike };
-  if (!g.DOMParser) throw new GpxParseError('DOMParser není k dispozici.');
+  if (!g.DOMParser) throw new GpxParseError('no_parser');
   return new g.DOMParser();
 }
 
@@ -62,18 +75,25 @@ function countPoints(doc: Document): { raw: number; valid: number } {
  * individual bad points, only for documents that are not GPX at all.
  */
 export function parseGpx(xml: string, parser?: DomParserLike): ParsedGpx {
-  if (typeof xml !== 'string' || xml.trim() === '') throw new GpxParseError('Soubor je prázdný.');
-  const doc = getParser(parser).parseFromString(xml, 'application/xml');
-  if (doc.getElementsByTagName('parsererror').length > 0) {
-    throw new GpxParseError('Soubor není platné XML.');
+  if (typeof xml !== 'string' || xml.trim() === '') throw new GpxParseError('empty');
+  const domParser = getParser(parser);
+  let doc: Document;
+  try {
+    doc = domParser.parseFromString(xml, 'application/xml');
+  } catch {
+    // some parsers (e.g. xmldom) throw instead of returning a <parsererror> document
+    throw new GpxParseError('invalid_xml');
+  }
+  if (!doc || doc.getElementsByTagName('parsererror').length > 0) {
+    throw new GpxParseError('invalid_xml');
   }
   const root = doc.documentElement;
   if (!root || root.nodeName.toLowerCase().replace(/^.*:/, '') !== 'gpx') {
-    throw new GpxParseError('Soubor neobsahuje kořenový element <gpx>.');
+    throw new GpxParseError('not_gpx');
   }
 
   const { raw: rawPointCount, valid: rawValidCount } = countPoints(doc);
-  const warnings: string[] = [];
+  const warnings: GpxWarning[] = [];
   const fc = gpxToGeoJSON(doc);
 
   const segments: TrackPoint[][] = [];
@@ -120,19 +140,19 @@ export function parseGpx(xml: string, parser?: DomParserLike): ParsedGpx {
       // drop consecutive duplicates
       const dedup = seg.filter((p, i) => i === 0 || p.lon !== seg[i - 1].lon || p.lat !== seg[i - 1].lat);
       if (dedup.length >= 2) segments.push(dedup);
-      else if (dedup.length === 1) warnings.push('Segment s jediným platným bodem byl vynechán.');
+      else if (dedup.length === 1 && !warnings.some((w) => w.code === 'single_point_segment')) warnings.push({ code: 'single_point_segment' });
     });
   }
 
   const invalid = rawPointCount - rawValidCount;
   const singles = rawValidCount - valid;
-  if (singles > 0 && !warnings.some((w) => w.includes('jediným'))) warnings.push('Segment s jediným platným bodem byl vynechán.');
-  if (invalid > 0) warnings.push(`Vynecháno ${invalid} neplatných bodů (chybné nebo chybějící souřadnice).`);
-  if (segments.length === 0) throw new GpxParseError('Soubor neobsahuje žádnou trasu (trk/rte) s platnými body.');
+  if (singles > 0 && !warnings.some((w) => w.code === 'single_point_segment')) warnings.push({ code: 'single_point_segment' });
+  if (invalid > 0) warnings.push({ code: 'invalid_points', count: invalid });
+  if (segments.length === 0) throw new GpxParseError('no_track');
 
   const elevationCoverage = valid ? withEle / valid : 0;
-  if (elevationCoverage === 0) warnings.push('Soubor neobsahuje údaje o nadmořské výšce.');
-  else if (elevationCoverage < 0.9) warnings.push('Nadmořská výška chybí u části bodů – převýšení může být nepřesné.');
+  if (elevationCoverage === 0) warnings.push({ code: 'no_elevation' });
+  else if (elevationCoverage < 0.9) warnings.push({ code: 'partial_elevation' });
 
   return {
     name,
@@ -161,7 +181,8 @@ export interface ElevationStats {
   min: number;
   max: number;
   reliable: boolean;
-  reason: string | null;
+  /** Why the numbers are unreliable (language-neutral), or null */
+  reason: { code: 'coverage'; share: number } | { code: 'range' } | null;
 }
 
 /**
@@ -187,9 +208,9 @@ export function elevationStats(values: Array<number | null>, threshold = 3): Ele
   }
   const min = Math.min(...present);
   const max = Math.max(...present);
-  let reason: string | null = null;
-  if (coverage < 0.9) reason = `Výška je k dispozici jen u ${(coverage * 100).toFixed(0)} % bodů.`;
-  else if (max - min > 3000) reason = 'Rozsah výšek je nereálný.';
+  let reason: ElevationStats['reason'] = null;
+  if (coverage < 0.9) reason = { code: 'coverage', share: coverage };
+  else if (max - min > 3000) reason = { code: 'range' };
   return { gain, loss, min, max, reliable: reason === null, reason };
 }
 

@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { Box, Chip, IconButton, Paper, Table, TableBody, TableCell, TableRow, Tooltip, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
-import { CATEGORIES } from '@bce/shared';
+import { CATEGORIES, categoryDescription, categoryLabel } from '@bce/shared';
+import { useI18n } from '../../i18n';
 import { useInfrastructure } from '../../hooks/data';
 import { useAppStore } from '../../store/useAppStore';
 import { fmtDistance } from '../../services/format';
@@ -13,6 +14,7 @@ export function FeatureInspector() {
   const id = useAppStore((s) => s.selectedFeatureId);
   const set = useAppStore((s) => s.set);
   const fitTo = useAppStore((s) => s.fitTo);
+  const { t, lang } = useI18n();
   const { data } = useInfrastructure();
   const feature = useMemo(() => data?.data.features.find((f) => f.properties.id === id) ?? null, [data, id]);
   if (!feature) return null;
@@ -28,28 +30,28 @@ export function FeatureInspector() {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <LineSwatch category={p.category} />
         <Typography variant="subtitle2" sx={{ flex: 1 }}>
-          {cat.label}
+          {categoryLabel(p.category, lang)}
         </Typography>
-        <Tooltip title="Přiblížit">
-          <IconButton size="small" aria-label="Přiblížit na prvek" onClick={() => { const b = linesBounds(lines); if (b) fitTo(b); }}>
+        <Tooltip title={t('feature.zoom')}>
+          <IconButton size="small" aria-label={t('feature.zoomTo')} onClick={() => { const b = linesBounds(lines); if (b) fitTo(b); }}>
             <ZoomInIcon fontSize="small" />
           </IconButton>
         </Tooltip>
-        <IconButton size="small" aria-label="Zavřít detail" onClick={() => set({ selectedFeatureId: null })}>
+        <IconButton size="small" aria-label={t('feature.close')} onClick={() => set({ selectedFeatureId: null })}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
       <Typography variant="caption" color="text.secondary" component="p" sx={{ my: 0.5 }}>
-        {cat.description}
+        {categoryDescription(p.category, lang)}
       </Typography>
       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 1 }}>
-        <Chip size="small" label={p.source === 'official' ? 'Oficiální záznam města' : 'Importovaná data'} color={p.source === 'official' ? 'success' : 'warning'} variant="outlined" />
-        <Chip size="small" label={cat.physicallySeparated ? 'Mimo běžný provoz aut' : 'Na vozovce / sdílený provoz'} variant="outlined" />
+        <Chip size="small" label={p.source === 'official' ? t('feature.official') : t('feature.imported')} color={p.source === 'official' ? 'success' : 'warning'} variant="outlined" />
+        <Chip size="small" label={cat.physicallySeparated ? t('feature.offRoad') : t('feature.onRoad')} variant="outlined" />
       </Box>
       <Typography variant="overline" color="text.secondary">
-        Původní atributy
+        {t('feature.attributes')}
       </Typography>
-      <Table size="small" aria-label="Původní atributy prvku">
+      <Table size="small" aria-label={t('feature.attributesAria')}>
         <TableBody>
           {Object.entries(p.original).map(([k, v]) => (
             <TableRow key={k}>
@@ -58,7 +60,7 @@ export function FeatureInspector() {
             </TableRow>
           ))}
           <TableRow>
-            <TableCell sx={{ py: 0.25, pl: 0, color: 'text.secondary', fontSize: 12 }}>Délka geometrie (vypočteno)</TableCell>
+            <TableCell sx={{ py: 0.25, pl: 0, color: 'text.secondary', fontSize: 12 }}>{t('feature.geomLength')}</TableCell>
             <TableCell sx={{ py: 0.25, pr: 0, fontSize: 12 }}>{fmtDistance(p.geodesicLength)}</TableCell>
           </TableRow>
         </TableBody>

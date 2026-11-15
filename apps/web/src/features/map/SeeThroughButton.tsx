@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, Button, ButtonBase, ClickAwayListener, Paper, Slider, Typography } from '@mui/material';
 import OpacityIcon from '@mui/icons-material/Opacity';
 import { useAppStore } from '../../store/useAppStore';
+import { useI18n } from '../../i18n';
 
 export const MIN_OVERLAY_OPACITY = 0.15;
 
@@ -13,6 +14,7 @@ export function SeeThroughButton() {
   const value = useAppStore((s) => s.overlayOpacity);
   const set = useAppStore((s) => s.set);
   const [open, setOpen] = useState(false);
+  const { t } = useI18n();
   const dimmed = value < 0.999;
   const pct = Math.round(value * 100);
 
@@ -21,9 +23,9 @@ export function SeeThroughButton() {
       <Box sx={{ position: 'absolute', right: 10, top: 152, zIndex: 3 }}>
         <ButtonBase
           onClick={() => setOpen(!open)}
-          aria-label={`Průhlednost čar (neprůhlednost ${pct} %)`}
+          aria-label={t('opacity.button', { pct })}
           aria-expanded={open}
-          title="Průhlednost čar"
+          title={t('opacity.title')}
           data-testid="see-through-button"
           sx={{
             width: 32,
@@ -43,7 +45,7 @@ export function SeeThroughButton() {
             sx={{ position: 'absolute', right: 40, top: 0, width: 230, px: 2, pt: 1, pb: 0.5 }}
           >
             <Typography variant="caption" id="overlay-opacity-label" component="div">
-              Neprůhlednost čar: <b>{pct} %</b>
+              {t('opacity.label')} <b>{pct} %</b>
             </Typography>
             <Slider
               size="small"
@@ -57,7 +59,7 @@ export function SeeThroughButton() {
             />
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
               <Typography variant="caption" color="text.secondary">
-                Nižší = víc vidět silnice
+                {t('opacity.hint')}
               </Typography>
               <Button size="small" onClick={() => set({ overlayOpacity: 1 })} disabled={!dimmed} sx={{ minWidth: 0 }}>
                 100 %

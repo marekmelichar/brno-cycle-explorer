@@ -1,4 +1,4 @@
-import type { OsmInterval } from '@bce/shared';
+import type { Lang, OsmInterval } from '@bce/shared';
 
 /** Parses BRouter's "WayTags" string ("highway=residential surface=asphalt") into a tag map. */
 export function parseWayTags(s: string | null | undefined): Record<string, string> {
@@ -37,6 +37,21 @@ export const OSM_CLASS_LABELS: Record<OsmClass, string> = {
   other: 'jiné',
 };
 
+export const OSM_CLASS_LABELS_EN: Record<OsmClass, string> = {
+  cycleway: 'cycle path in OSM',
+  path: 'path / footway',
+  pedestrian: 'pedestrian zone',
+  track: 'field / forest track',
+  quiet_street: 'quiet street (residential / zone)',
+  service: 'service road',
+  minor_road: 'minor road',
+  main_road: 'main road',
+  steps: 'steps',
+  other: 'other',
+};
+
+export const osmClassLabel = (c: OsmClass, lang: Lang = 'cs') => (lang === 'en' ? OSM_CLASS_LABELS_EN[c] : OSM_CLASS_LABELS[c]);
+
 export const OSM_CLASS_ORDER: OsmClass[] = ['cycleway', 'path', 'pedestrian', 'track', 'quiet_street', 'service', 'minor_road', 'main_road', 'steps', 'other'];
 
 export function osmClass(tags: Record<string, string>): OsmClass {
@@ -52,6 +67,24 @@ export function osmClass(tags: Record<string, string>): OsmClass {
   if (/^(primary|secondary|trunk)(_link)?$/.test(h)) return 'main_road';
   return 'other';
 }
+
+const SURFACE_EN: Record<string, string> = {
+  asphalt: 'asphalt',
+  paved: 'paved',
+  concrete: 'concrete',
+  'concrete:plates': 'concrete plates',
+  paving_stones: 'paving stones',
+  sett: 'setts',
+  cobblestone: 'cobblestones',
+  compacted: 'compacted gravel',
+  fine_gravel: 'fine gravel',
+  gravel: 'gravel',
+  unpaved: 'unpaved',
+  ground: 'ground',
+  dirt: 'dirt',
+  grass: 'grass',
+  wood: 'wood',
+};
 
 const SURFACE: Record<string, string> = {
   asphalt: 'asfalt',
@@ -72,12 +105,12 @@ const SURFACE: Record<string, string> = {
 };
 
 /** Short Czech description of an OSM way, e.g. "klidná ulice (obytná / zóna), asfalt, max 30 km/h". */
-export function describeOsm(tags: Record<string, string>): string {
-  const parts: string[] = [OSM_CLASS_LABELS[osmClass(tags)]];
-  if (tags.surface) parts.push(SURFACE[tags.surface] ?? tags.surface);
+export function describeOsm(tags: Record<string, string>, lang: Lang = 'cs'): string {
+  const parts: string[] = [osmClassLabel(osmClass(tags), lang)];
+  if (tags.surface) parts.push((lang === 'en' ? SURFACE_EN : SURFACE)[tags.surface] ?? tags.surface);
   if (tags.maxspeed && /^\d+$/.test(tags.maxspeed)) parts.push(`max ${tags.maxspeed} km/h`);
   if (tags.cycleway && tags.cycleway !== 'no') parts.push(`cycleway=${tags.cycleway}`);
-  if (tags.bicycle === 'designated' && osmClass(tags) !== 'cycleway') parts.push('určeno pro kola');
+  if (tags.bicycle === 'designated' && osmClass(tags) !== 'cycleway') parts.push(lang === 'en' ? 'designated for bikes' : 'určeno pro kola');
   return parts.join(', ');
 }
 

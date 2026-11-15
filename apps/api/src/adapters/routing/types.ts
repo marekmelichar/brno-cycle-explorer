@@ -8,9 +8,16 @@ export interface RoutingProvider {
   route(req: RouteRequest): Promise<RouteResponse>;
 }
 
+export type RoutingErrorCode = 'invalid' | 'no_route' | 'routing_not_configured' | 'routing_unavailable';
+
 export class RoutingError extends Error {
-  constructor(message: string, readonly statusCode = 502) {
+  /** `detail`: raw upstream message (often English), shown after the translated text. */
+  constructor(message: string, readonly statusCode = 502, readonly detail?: string) {
     super(message);
+  }
+
+  get code(): RoutingErrorCode {
+    return this.statusCode === 400 ? 'invalid' : this.statusCode === 422 ? 'no_route' : this.statusCode === 503 ? 'routing_not_configured' : 'routing_unavailable';
   }
 }
 

@@ -10,7 +10,7 @@ import {
   type RouteCandidate,
   type OsmInterval,
 } from '@bce/shared';
-import { DEFAULT_MATCH_OPTIONS, type MatchOptions, type TrackPoint } from '@bce/geo';
+import { DEFAULT_MATCH_OPTIONS, type GpxWarning, type MatchOptions, type TrackPoint } from '@bce/geo';
 
 export type SidebarTab = 'map' | 'planner' | 'gpx' | 'stats';
 export type PlannerMode = 'auto' | 'manual';
@@ -50,7 +50,7 @@ export interface GpxInfo {
   fileName: string;
   name: string | null;
   segments: TrackPoint[][];
-  warnings: string[];
+  warnings: GpxWarning[];
   stats: { rawPointCount: number; validPointCount: number; invalidPointCount: number; segmentCount: number; elevationCoverage: number };
 }
 

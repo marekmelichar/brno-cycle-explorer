@@ -90,12 +90,12 @@ export class ValhallaProvider implements RoutingProvider {
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (e) {
-      throw new RoutingError(`Směrovací server není dostupný: ${e instanceof Error ? e.message : e}`);
+      throw new RoutingError(`Směrovací server není dostupný: ${e instanceof Error ? e.message : e}`, 502, e instanceof Error ? e.message : String(e));
     }
     const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) {
       const msg = (json.error as string) ?? `HTTP ${res.status}`;
-      throw new RoutingError(`Směrovací server vrátil chybu: ${msg}`, res.status === 400 ? 422 : 502);
+      throw new RoutingError(`Směrovací server vrátil chybu: ${msg}`, res.status === 400 ? 422 : 502, msg);
     }
     const trips = [json.trip, ...((json.alternates as Array<{ trip: unknown }> | undefined)?.map((a) => a.trip) ?? [])];
     return trips.filter(Boolean).map((t) => {

@@ -1,11 +1,11 @@
-import { normalizeTypOpatreni, type InfraCategory, type InfraFeature, type LngLat, type MunicipalProperties } from '@bce/shared';
+import { normalizeTypOpatreni, type DataWarning, type InfraCategory, type InfraFeature, type LngLat, type MunicipalProperties } from '@bce/shared';
 import { isValidLngLat, lineLength } from './distance';
 
 export const EXPECTED_FIELDS = ['ObjectId', 'typ_opatreni', 'rok_realizace', 'delka', 'datum_exportu', 'Shape__Length'];
 
 export interface NormalizeResult {
   features: InfraFeature[];
-  warnings: string[];
+  warnings: DataWarning[];
   skipped: number;
   distinctTypes: Array<{ value: string | null; count: number; category: InfraCategory }>;
   latestExportDate: string | null;
@@ -43,7 +43,7 @@ function formatExportDate(v: unknown): string | null {
  * Original properties are kept verbatim in `properties.original`.
  */
 export function normalizeInfrastructure(raw: unknown, source: 'official' | 'imported'): NormalizeResult {
-  const warnings: string[] = [];
+  const warnings: DataWarning[] = [];
   if (!raw || typeof raw !== 'object' || (raw as { type?: string }).type !== 'FeatureCollection' || !Array.isArray((raw as { features?: unknown }).features)) {
     throw new Error('Data nejsou GeoJSON FeatureCollection.');
   }
@@ -58,7 +58,7 @@ export function normalizeInfrastructure(raw: unknown, source: 'official' | 'impo
     const flat = JSON.stringify(first?.geometry.coordinates ?? []).match(/-?\d+(\.\d+)?(e[+-]?\d+)?/gi);
     if (flat && Math.abs(Number(flat[0])) > 180) {
       mercator = true;
-      warnings.push('Souřadnice byly v Web Mercator (EPSG:3857) a byly převedeny na WGS84.');
+      warnings.push({ code: 'mercator_converted' });
     }
   }
 
@@ -108,8 +108,8 @@ export function normalizeInfrastructure(raw: unknown, source: 'official' | 'impo
     });
   }
   const missing = EXPECTED_FIELDS.filter((k) => !fieldNames.has(k));
-  if (fc.features.length > 0 && missing.length) warnings.push(`Chybějící očekávaná pole: ${missing.join(', ')}.`);
-  if (skipped) warnings.push(`${skipped} záznamů bez platné liniové geometrie bylo vynecháno.`);
+  if (fc.features.length > 0 && missing.length) warnings.push({ code: 'missing_fields', fields: missing });
+  if (skipped) warnings.push({ code: 'skipped_no_geometry', count: skipped });
   const distinctTypes = [...counts.entries()]
     .map(([value, count]) => ({ value, count, category: normalizeTypOpatreni(value) }))
     .sort((a, b) => b.count - a.count);

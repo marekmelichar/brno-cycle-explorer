@@ -136,6 +136,29 @@ function xyBearing(a: XY, b: XY): number {
 
 export type Confidence = 'high' | 'medium' | 'none';
 
+/** Why a nearby infrastructure line was rejected for a route piece (values in m, deg or ratio). */
+export type RejectReason =
+  | { code: 'distance'; value: number; limit: number }
+  | { code: 'diverging'; value: number }
+  | { code: 'angle'; value: number }
+  | { code: 'overlap'; value: number };
+
+/** Language-neutral explanation of a piece's classification; the UI turns it into text. */
+export type PieceReason =
+  | { code: 'matched'; featureId: number; distance: number; angle: number; overlap: number; ambiguousWith?: { category: InfraCategory; featureId: number } }
+  | { code: 'outside' }
+  | { code: 'none_nearby'; tolerance: number }
+  | { code: 'rejected'; reject: RejectReason }
+  | { code: 'short_run'; length: number; min: number; category: InfraCategory; prior: PieceReason }
+  | { code: 'gap'; length: number; prior: PieceReason };
+
+export type QualityNote =
+  | { code: 'no_data' }
+  | { code: 'sparse'; spacing: number }
+  | { code: 'outside'; share: number }
+  | { code: 'ambiguous'; share: number }
+  | { code: 'not_road' };
+
 export interface CandidateInfo {
   featureId: number;
   category: InfraCategory;
@@ -145,7 +168,7 @@ export interface CandidateInfo {
   angle: number;
   overlapRatio: number;
   accepted: boolean;
-  rejectReason?: string;
+  reject?: RejectReason;
 }
 
 export interface RoutePiece {
@@ -161,7 +184,7 @@ export interface RoutePiece {
   angle: number | null;
   confidence: Confidence;
   ambiguous: boolean;
-  reason: string;
+  reason: PieceReason;
   candidates: CandidateInfo[];
 }
 
@@ -180,7 +203,7 @@ export interface RouteSection {
   maxAngle: number | null;
   confidence: Confidence;
   ambiguousLength: number;
-  reasons: string[];
+  reasons: PieceReason[];
 }
 
 export interface CategoryStat {
@@ -197,7 +220,7 @@ export interface QualityReport {
   ambiguousShare: number;
   outsideCoverageShare: number;
   meanPointSpacing: number;
-  notes: string[];
+  notes: QualityNote[];
 }
 
 export interface RouteAnalysis {
@@ -309,11 +332,11 @@ export function analyzeRoute(lines: LngLat[][], index: InfraIndex, opts: Partial
       const maxDistance = Math.max(bestA.dist, bestB.dist, bestM.dist);
       const distance = (bestA.dist + bestB.dist + bestM.dist) / 3;
       const feat = index.features[fi];
-      let rejectReason: string | undefined;
-      if (bestM.dist > tolerance) rejectReason = `vzdálenost ${bestM.dist.toFixed(1)} m > ${tolerance} m`;
-      else if (maxDistance > tolerance * 1.5) rejectReason = `trasa se od linie vzdaluje (${maxDistance.toFixed(1)} m)`;
-      else if (angle > maxAngle) rejectReason = `odlišný směr (${angle.toFixed(0)}°) – pravděpodobně křížení`;
-      else if (overlapRatio < minOverlapRatio) rejectReason = `nedostatečný souběh (${(overlapRatio * 100).toFixed(0)} %)`;
+      let reject: RejectReason | undefined;
+      if (bestM.dist > tolerance) reject = { code: 'distance', value: bestM.dist, limit: tolerance };
+      else if (maxDistance > tolerance * 1.5) reject = { code: 'diverging', value: maxDistance };
+      else if (angle > maxAngle) reject = { code: 'angle', value: angle };
+      else if (overlapRatio < minOverlapRatio) reject = { code: 'overlap', value: overlapRatio };
       candidates.push({
         featureId: feat.id,
         category: feat.category,
@@ -321,25 +344,31 @@ export function analyzeRoute(lines: LngLat[][], index: InfraIndex, opts: Partial
         maxDistance,
         angle,
         overlapRatio,
-        accepted: !rejectReason,
-        rejectReason,
+        accepted: !reject,
+        reject,
       });
     }
     candidates.sort((x, y) => x.distance + x.angle * 0.2 - (y.distance + y.angle * 0.2));
     const accepted = candidates.filter((c) => c.accepted);
     const best = accepted[0];
     if (!best) {
-      let reason: string;
-      if (outside) reason = 'Mimo území pokryté městskou datovou sadou.';
-      else if (candidates.length === 0) reason = `V okruhu ${tolerance} m není žádný záznam cykloopatření.`;
-      else reason = `Blízké záznamy zamítnuty: ${candidates[0].rejectReason}.`;
+      let reason: PieceReason;
+      if (outside) reason = { code: 'outside' };
+      else if (candidates.length === 0) reason = { code: 'none_nearby', tolerance };
+      else reason = { code: 'rejected', reject: candidates[0].reject! };
       return { ...p, category: null, featureId: null, distance: null, angle: null, confidence: 'none' as Confidence, ambiguous: false, reason, candidates: candidates.slice(0, 4) };
     }
     const second = accepted.find((c) => c.category !== best.category);
     const ambiguous = !!second && second.distance + second.angle * 0.2 - (best.distance + best.angle * 0.2) < 2;
     const confidence: Confidence = !ambiguous && best.maxDistance <= tolerance * 0.6 && best.angle <= 15 ? 'high' : 'medium';
-    let reason = `Souběh s linií #${best.featureId}: odstup ${best.distance.toFixed(1)} m, odchylka směru ${best.angle.toFixed(0)}°, překryv ${(best.overlapRatio * 100).toFixed(0)} %.`;
-    if (ambiguous && second) reason += ` Nejednoznačné – blízko je i „${CATEGORIES[second.category].label}“ (#${second.featureId}).`;
+    const reason: PieceReason = {
+      code: 'matched',
+      featureId: best.featureId,
+      distance: best.distance,
+      angle: best.angle,
+      overlap: best.overlapRatio,
+      ...(ambiguous && second ? { ambiguousWith: { category: second.category, featureId: second.featureId } } : {}),
+    };
     return {
       ...p,
       category: best.category,
@@ -423,7 +452,7 @@ function bridgeGaps(pieces: RoutePiece[], maxGap: number) {
         p.category = before.category;
         p.featureId = null;
         p.confidence = 'medium';
-        p.reason = `Krátká mezera (${len.toFixed(0)} m) mezi úseky stejné kategorie – pravděpodobně přerušení linie v datech (např. křižovatka); přiřazeno se střední jistotou. ${p.reason}`;
+        p.reason = { code: 'gap', length: len, prior: p.reason };
       }
     }
     i = j;
@@ -445,7 +474,7 @@ function suppressShortRuns(pieces: RoutePiece[], minRun: number) {
     if (cat !== null && len < minRun) {
       for (let k = i; k < j; k++) {
         const p = pieces[k];
-        p.reason = `Krátký souběh (${len.toFixed(0)} m < ${minRun} m) s „${CATEGORIES[cat].label}“ byl vyřazen – pravděpodobně křížení nebo šum. ${p.reason}`;
+        p.reason = { code: 'short_run', length: len, min: minRun, category: cat, prior: p.reason };
         p.category = null;
         p.featureId = null;
         p.confidence = 'none';
@@ -502,14 +531,22 @@ function buildSections(pieces: RoutePiece[]): RouteSection[] {
     if (p.angle !== null) cur.maxAngle = Math.max(cur.maxAngle ?? 0, p.angle);
     if (p.confidence === 'high') highLen += p.length;
     if (p.ambiguous) cur.ambiguousLength += p.length;
-    if (cur.reasons.length < 3 && !cur.reasons.includes(p.reason)) cur.reasons.push(p.reason);
+    if (cur.reasons.length < 3 && !cur.reasons.some((r) => sameReasonKind(r, p.reason))) cur.reasons.push(p.reason);
   }
   flush();
   return sections;
 }
 
+/** Same explanation kind (ignoring small numeric differences between neighbouring pieces). */
+function sameReasonKind(a: PieceReason, b: PieceReason): boolean {
+  if (a.code !== b.code) return false;
+  if (a.code === 'matched' && b.code === 'matched') return a.featureId === b.featureId && !!a.ambiguousWith === !!b.ambiguousWith;
+  if (a.code === 'rejected' && b.code === 'rejected') return a.reject.code === b.reject.code;
+  return true;
+}
+
 function assessQuality(lines: LngLat[][], pieces: RoutePiece[], total: number, index: InfraIndex): QualityReport {
-  const notes: string[] = [];
+  const notes: QualityNote[] = [];
   let matched = 0,
     high = 0,
     amb = 0,
@@ -529,11 +566,11 @@ function assessQuality(lines: LngLat[][], pieces: RoutePiece[], total: number, i
   const ambiguousShare = s(amb);
   const outsideCoverageShare = s(outside);
 
-  if (index.size === 0) notes.push('Data o cykloinfrastruktuře nejsou načtena – nelze nic přiřadit.');
-  if (meanPointSpacing > 50) notes.push(`Řídké body trasy (průměrně ${meanPointSpacing.toFixed(0)} m) – přímé spojnice mohou zkreslit přiřazení.`);
-  if (outsideCoverageShare > 0.05) notes.push(`${(outsideCoverageShare * 100).toFixed(0)} % trasy leží mimo území městské datové sady.`);
-  if (ambiguousShare > 0.05) notes.push(`${(ambiguousShare * 100).toFixed(0)} % trasy má v blízkosti více různých typů opatření.`);
-  notes.push('Úseky bez záznamu nemusí být běžnou silnicí – městská data nezahrnují všechny cyklisticky vhodné cesty.');
+  if (index.size === 0) notes.push({ code: 'no_data' });
+  if (meanPointSpacing > 50) notes.push({ code: 'sparse', spacing: meanPointSpacing });
+  if (outsideCoverageShare > 0.05) notes.push({ code: 'outside', share: outsideCoverageShare });
+  if (ambiguousShare > 0.05) notes.push({ code: 'ambiguous', share: ambiguousShare });
+  notes.push({ code: 'not_road' });
 
   let level: QualityReport['level'] = 'vysoká';
   if (index.size === 0 || meanPointSpacing > 100 || outsideCoverageShare > 0.5) level = 'nízká';

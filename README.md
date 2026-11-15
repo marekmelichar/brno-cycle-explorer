@@ -1,7 +1,7 @@
 # Brno Cycle Explorer
 
 Web app for finding, viewing, analysing and planning bike routes in Brno. It uses the city's
-**official cycling infrastructure data** (ArcGIS FeatureServer) and **OpenStreetMap**. The UI is in Czech.
+**official cycling infrastructure data** (ArcGIS FeatureServer) and **OpenStreetMap**. The UI is in **Czech and English**.
 
 ![Desktop](docs/screenshots/desktop-overview.png)
 
@@ -70,6 +70,12 @@ Web app for finding, viewing, analysing and planning bike routes in Brno. It use
   characters, sends at most 1 request per second, and results are cached.
 - **Data provenance**: official records, OSM data, calculated routes, user GPX and inferred
   classifications are labelled separately (see the "Zdroje dat" dialog).
+
+## Languages and coverage
+
+- **Czech and English UI.** The language follows the browser (Czech/Slovak → Czech, anything else → English) and can be switched with the CZ/EN button in the top bar (desktop) or in Settings; the choice is remembered. Texts live in `apps/web/src/i18n/cs.ts` and `en.ts` (the English file is type-checked against the Czech keys).
+- Logic and the server stay language-neutral: route-matching explanations, quality notes, GPX and data warnings, score explanations and API errors are **codes**, turned into text by the UI (`apps/web/src/i18n/format.ts`). API errors carry `code` + upstream `detail` next to the Czech `error` message.
+- **Worldwide use:** the map, routing (BRouter, Valhalla), GPX import/analysis/export, OSM road descriptions and search work anywhere. Search is worldwide and prefers places in the visible map area. The official infrastructure layers, the path/lane classification, the statistics and the example route cover **Brno only**; elsewhere route sections show as "not verified" (with OSM descriptions for calculated routes).
 
 ## Quick start (development)
 

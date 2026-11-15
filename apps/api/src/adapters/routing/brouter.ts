@@ -9,6 +9,8 @@ type Assigns = Record<string, string | number | boolean>;
 
 export interface BrouterVariant {
   label: string;
+  /** Language-neutral id, translated in the UI */
+  code: string;
   /** Built-in profile name on the server, OR a custom profile = trekking + `assigns`. */
   builtin?: string;
   assigns?: Assigns;
@@ -46,25 +48,25 @@ export function brouterVariants(pref: RoutePreference, ride: RideType): BrouterV
   switch (pref) {
     case 'max_paths':
       return [
-        { label: 'BRouter: klidná trasa (mimo silnice, u řek, v tichu)', assigns: { ...r, avoid_unsafe: true, consider_traffic: true, consider_noise: true, consider_river: true }, alternatives: 1 },
-        { label: 'BRouter: mimo silnice', assigns: { ...r, avoid_unsafe: true, consider_traffic: true } },
-        { label: 'BRouter: profil safety', builtin: 'safety' },
+        { label: 'BRouter: klidná trasa (mimo silnice, u řek, v tichu)', code: 'brouter.pleasant', assigns: { ...r, avoid_unsafe: true, consider_traffic: true, consider_noise: true, consider_river: true }, alternatives: 1 },
+        { label: 'BRouter: mimo silnice', code: 'brouter.quiet', assigns: { ...r, avoid_unsafe: true, consider_traffic: true } },
+        { label: 'BRouter: profil safety', code: 'brouter.safety', builtin: 'safety' },
       ];
     case 'min_roads':
       return [
-        { label: 'BRouter: mimo silnice', assigns: { ...r, avoid_unsafe: true, consider_traffic: true }, alternatives: 1 },
-        { label: 'BRouter: profil safety', builtin: 'safety' },
+        { label: 'BRouter: mimo silnice', code: 'brouter.quiet', assigns: { ...r, avoid_unsafe: true, consider_traffic: true }, alternatives: 1 },
+        { label: 'BRouter: profil safety', code: 'brouter.safety', builtin: 'safety' },
       ];
     case 'min_climb':
       return [
-        { label: 'BRouter: co nejméně stoupání', assigns: { ...r, avoid_unsafe: true, uphillcost: 80, uphillcutoff: 1.0 }, alternatives: 1 },
-        { label: 'BRouter: profil trekking', builtin: 'trekking' },
+        { label: 'BRouter: co nejméně stoupání', code: 'brouter.flat', assigns: { ...r, avoid_unsafe: true, uphillcost: 80, uphillcutoff: 1.0 }, alternatives: 1 },
+        { label: 'BRouter: profil trekking', code: 'brouter.trekking', builtin: 'trekking' },
       ];
     case 'shortest':
     default:
       return [
-        { label: 'BRouter: nejkratší', builtin: 'shortest' },
-        { label: 'BRouter: rychlá jízda (fastbike)', builtin: 'fastbike', alternatives: 1 },
+        { label: 'BRouter: nejkratší', code: 'brouter.shortest', builtin: 'shortest' },
+        { label: 'BRouter: rychlá jízda (fastbike)', code: 'brouter.fastbike', builtin: 'fastbike', alternatives: 1 },
       ];
   }
 }
@@ -149,7 +151,7 @@ export class BrouterProvider implements RoutingProvider {
       try {
         return await this.fetchFn(url, { ...init, signal: AbortSignal.timeout(this.timeoutMs) });
       } catch (e) {
-        throw new RoutingError(`Směrovač BRouter není dostupný: ${e instanceof Error ? e.message : e}`);
+        throw new RoutingError(`Směrovač BRouter není dostupný: ${e instanceof Error ? e.message : e}`, 502, e instanceof Error ? e.message : String(e));
       }
     });
     this.queue = task.catch(() => undefined);
@@ -176,7 +178,7 @@ export class BrouterProvider implements RoutingProvider {
     const text = await res.text();
     if (!res.ok) {
       const msg = text.trim().slice(0, 200) || `HTTP ${res.status}`;
-      throw new RoutingError(`Směrovač BRouter: ${msg}`, /not found|no track|target island|too far/i.test(msg) ? 422 : 502);
+      throw new RoutingError(`Směrovač BRouter: ${msg}`, /not found|no track|target island|too far/i.test(msg) ? 422 : 502, msg);
     }
     try {
       return parseBrouterTrack(JSON.parse(text) as BrouterGeoJson);
@@ -216,6 +218,8 @@ export class BrouterProvider implements RoutingProvider {
           candidates.push({
             id: `b${i}-${alt}`,
             variant: alt === 0 ? v.label : `${v.label} – alternativa ${alt}`,
+            variantCode: v.code,
+            alternative: alt,
             coordinates: t.coords,
             elevation: t.ele,
             elevationInterval: null,
