@@ -18,6 +18,8 @@ import { RouteColorButton, SIMPLE_ROUTE_COLOR } from './RouteColorButton';
 type StyleStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; message?: string };
 
 const STYLE_TIMEOUT_MS = 15000;
+/** Zoom cap when fitting to one point: about 2 km across on a phone, so you can still see where you are. */
+const SINGLE_POINT_ZOOM = 15;
 
 async function fetchStyle(url: string): Promise<StyleSpecification> {
   let res: Response;
@@ -275,12 +277,14 @@ export function MapView() {
     if (!map || !fitRequest) return;
     const [a, b, c, d] = fitRequest.bounds;
     const mobile = window.innerWidth < 900;
+    // a single point (e.g. "my location" alone): street level, but keep the neighbourhood in view
+    const single = a === c && b === d;
     map.fitBounds(
       [
         [a, b],
         [c, d],
       ],
-      { padding: mobile ? { top: 70, bottom: window.innerHeight * 0.45, left: 30, right: 30 } : 60, maxZoom: 16, duration: 700 },
+      { padding: mobile ? { top: 70, bottom: window.innerHeight * 0.45, left: 30, right: 30 } : 60, maxZoom: single ? SINGLE_POINT_ZOOM : 16, duration: 700 },
     );
   }, [fitRequest]);
 

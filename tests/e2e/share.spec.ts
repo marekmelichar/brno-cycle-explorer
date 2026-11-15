@@ -65,6 +65,8 @@ test.describe('share link + start from my location', () => {
     const box = (await page.getByTestId('map-container').boundingBox())!;
     // wait for the fly-to the location to finish, then click ~250 m east of it
     await page.waitForFunction(() => !(window as any).__bceMap.isMoving());
+    // zoomed to the location, but capped so the neighbourhood stays in view
+    expect(await page.evaluate(() => (window as any).__bceMap.getZoom())).toBeCloseTo(15, 1);
     const b = await page.evaluate(() => (window as any).__bceMap.project([16.6115, 49.2012]));
     await page.mouse.click(box.x + b.x, box.y + b.y);
     await expect(page.getByTestId('waypoint-list').locator('li')).toHaveCount(2);
