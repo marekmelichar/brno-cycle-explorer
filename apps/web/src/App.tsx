@@ -7,6 +7,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TopBar } from './components/TopBar';
+import { useI18n } from './i18n';
 import { MapView } from './features/map/MapView';
 import { InfrastructurePanel } from './features/infrastructure/InfrastructurePanel';
 import { PlannerPanel } from './features/routing/PlannerPanel';
@@ -21,10 +22,10 @@ import { useActiveAnalysis } from './hooks/data';
 import { RouteSummaryBar } from './components/RouteSummaryBar';
 
 const TABS: Array<{ id: SidebarTab; label: string; short: string; icon: ReactNode }> = [
-  { id: 'map', label: 'Mapa cykloopatření', short: 'Mapa', icon: <MapIcon fontSize="small" /> },
-  { id: 'planner', label: 'Plánovač trasy', short: 'Plánovač', icon: <RouteIcon fontSize="small" /> },
-  { id: 'gpx', label: 'Analýza GPX', short: 'GPX', icon: <TimelineIcon fontSize="small" /> },
-  { id: 'stats', label: 'Statistiky', short: 'Statistiky', icon: <BarChartIcon fontSize="small" /> },
+  { id: 'map', label: 'tabs.map', short: 'tabs.mapShort', icon: <MapIcon fontSize="small" /> },
+  { id: 'planner', label: 'tabs.planner', short: 'tabs.plannerShort', icon: <RouteIcon fontSize="small" /> },
+  { id: 'gpx', label: 'tabs.gpx', short: 'tabs.gpxShort', icon: <TimelineIcon fontSize="small" /> },
+  { id: 'stats', label: 'tabs.stats', short: 'tabs.statsShort', icon: <BarChartIcon fontSize="small" /> },
 ];
 
 function TabContent({ tab }: { tab: SidebarTab }) {
@@ -39,6 +40,7 @@ function TabContent({ tab }: { tab: SidebarTab }) {
 }
 
 function SidebarTabs({ compact }: { compact?: boolean }) {
+  const { t: tr } = useI18n();
   const tab = useAppStore((s) => s.tab);
   const setTab = useAppStore((s) => s.setTab);
   return (
@@ -46,7 +48,7 @@ function SidebarTabs({ compact }: { compact?: boolean }) {
       value={tab}
       onChange={(_, v) => setTab(v)}
       variant="fullWidth"
-      aria-label="Panely aplikace"
+      aria-label={tr('app.tabsLabel')}
       sx={{ borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}
     >
       {TABS.map((t) => (
@@ -55,7 +57,7 @@ function SidebarTabs({ compact }: { compact?: boolean }) {
           value={t.id}
           icon={t.icon as React.ReactElement}
           iconPosition={compact ? 'start' : 'top'}
-          label={compact ? t.short : t.label}
+          label={tr(compact ? t.short : t.label)}
           id={`tab-${t.id}`}
           aria-controls="sidebar-panel"
           data-testid={`tab-${t.id}`}
@@ -92,14 +94,16 @@ function useWindowDrop() {
 }
 
 function DropOverlay() {
+  const { t } = useI18n();
   return (
     <Box sx={{ position: 'absolute', inset: 0, zIndex: 10, bgcolor: 'rgba(45,212,191,0.15)', border: '3px dashed #2dd4bf', display: 'grid', placeItems: 'center', pointerEvents: 'none' }}>
-      <Paper sx={{ px: 3, py: 2, fontWeight: 600 }}>Pusťte soubor GPX pro import a analýzu</Paper>
+      <Paper sx={{ px: 3, py: 2, fontWeight: 600 }}>{t('app.dropGpx')}</Paper>
     </Box>
   );
 }
 
 export function App() {
+  const { t } = useI18n();
   const desktop = useMediaQuery('(min-width:900px)');
   const tab = useAppStore((s) => s.tab);
   const [sheet, setSheet] = useState<'peek' | 'half' | 'full'>('peek');
@@ -166,7 +170,7 @@ export function App() {
               {sheet !== 'peek' && (
                 <IconButton
                   size="small"
-                  aria-label="Sbalit panel"
+                  aria-label={t('app.collapsePanel')}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSheet('peek');
@@ -178,7 +182,7 @@ export function App() {
               {sheet !== 'full' && (
                 <IconButton
                   size="small"
-                  aria-label="Rozbalit panel"
+                  aria-label={t('app.expandPanel')}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSheet(sheet === 'peek' ? 'half' : 'full');

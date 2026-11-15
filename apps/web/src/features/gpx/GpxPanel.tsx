@@ -11,8 +11,11 @@ import { useAppStore } from '../../store/useAppStore';
 import { useExportGpx, useGpxImport } from '../../hooks/useRouteActions';
 import { RouteStats } from '../../components/RouteStats';
 import { linesBounds } from '../../services/geometry';
+import { useI18n } from '../../i18n';
+import { gpxWarningText } from '../../i18n/format';
 
 export function GpxDropZone() {
+  const { t } = useI18n();
   const importGpx = useGpxImport();
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -42,10 +45,10 @@ export function GpxDropZone() {
     >
       <UploadFileIcon color="primary" />
       <Typography variant="body2" sx={{ my: 0.5 }}>
-        Přetáhněte sem soubor <b>.gpx</b>
+        {t('gpxPanel.drop')} <b>.gpx</b>
       </Typography>
       <Button variant="contained" size="small" onClick={() => inputRef.current?.click()} data-testid="gpx-pick">
-        Vybrat soubor
+        {t('gpxPanel.pick')}
       </Button>
       <input
         ref={inputRef}
@@ -64,6 +67,7 @@ export function GpxDropZone() {
 }
 
 export function GpxPanel() {
+  const { t } = useI18n();
   const gpx = useAppStore((s) => s.gpx);
   const active = useAppStore((s) => s.activeRoute);
   const set = useAppStore((s) => s.set);
@@ -87,12 +91,11 @@ export function GpxPanel() {
       <GpxDropZone />
       {!gpx && (
         <Typography variant="body2" color="text.secondary">
-          Importujte svou GPX stopu (trasy i tracky, i s více segmenty). Aplikace spočítá délku, převýšení a geometricky určí, jaká část vede po zaznamenané
-          cyklistické infrastruktuře.
+          {t('gpxPanel.intro')}
         </Typography>
       )}
       {infra && infra.data.features.length === 0 && (
-        <Alert severity="warning">Data o infrastruktuře nejsou načtena – analýzu nelze provést, zobrazí se jen trasa.</Alert>
+        <Alert severity="warning">{t('gpxPanel.noData')}</Alert>
       )}
       {gpx && (
         <>
@@ -101,18 +104,18 @@ export function GpxPanel() {
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }} data-testid="gpx-name">
                 {gpx.name ?? gpx.fileName}
               </Typography>
-              <Chip size="small" label="Uživatelská GPX stopa" variant="outlined" />
-              {!isGpx && <Chip size="small" color="warning" label="Na mapě je jiná trasa" />}
+              <Chip size="small" label={t('gpxPanel.userTrack')} variant="outlined" />
+              {!isGpx && <Chip size="small" color="warning" label={t('gpxPanel.otherOnMap')} />}
             </Box>
             <Typography variant="caption" color="text.secondary">
-              {gpx.fileName} · {gpx.stats.validPointCount} platných bodů · {gpx.stats.segmentCount} segment(ů)
-              {gpx.stats.invalidPointCount > 0 && ` · ${gpx.stats.invalidPointCount} vynecháno`}
+              {t('gpxPanel.info', { file: gpx.fileName, valid: gpx.stats.validPointCount, segments: gpx.stats.segmentCount })}
+              {gpx.stats.invalidPointCount > 0 && t('gpxPanel.skipped', { count: gpx.stats.invalidPointCount })}
             </Typography>
           </Box>
           {gpx.warnings.length > 0 && (
             <Alert severity="warning" variant="outlined" sx={{ '& .MuiAlert-message': { fontSize: 12 } }}>
               {gpx.warnings.map((w) => (
-                <div key={w}>{w}</div>
+                <div key={w.code}>{gpxWarningText(w, t)}</div>
               ))}
             </Alert>
           )}
@@ -133,17 +136,17 @@ export function GpxPanel() {
                   })
                 }
               >
-                Zobrazit GPX
+                {t('gpxPanel.show')}
               </Button>
             )}
             <Button size="small" startIcon={<CenterFocusStrongIcon />} onClick={() => { const b = active && linesBounds(active.lines); if (b) fitTo(b); }}>
-              Přiblížit
+              {t('gpxPanel.zoom')}
             </Button>
             <Button size="small" startIcon={<DownloadIcon />} onClick={exportGpx}>
-              Export GPX
+              {t('gpxPanel.export')}
             </Button>
             <Button size="small" startIcon={<EditRoadIcon />} onClick={useInPlanner}>
-              Použít v plánovači
+              {t('gpxPanel.usePlanner')}
             </Button>
             <Button
               size="small"
@@ -151,11 +154,11 @@ export function GpxPanel() {
               startIcon={<DeleteOutlineIcon />}
               onClick={() => set({ gpx: null, activeRoute: isGpx ? null : active, selectedSectionId: null })}
             >
-              Odstranit
+              {t('gpxPanel.remove')}
             </Button>
           </Stack>
           {isGpx && analysis && <RouteStats analysis={analysis} elevation={elev} />}
-          {isGpx && !elev && <Typography variant="caption" color="text.secondary">Převýšení: soubor neobsahuje použitelné výškové údaje.</Typography>}
+          {isGpx && !elev && <Typography variant="caption" color="text.secondary">{t('gpxPanel.noElevation')}</Typography>}
         </>
       )}
     </Stack>

@@ -13,7 +13,9 @@ import {
   Typography,
 } from '@mui/material';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CATEGORIES, CATEGORY_ORDER, type InfraCategory } from '@bce/shared';
+import { CATEGORIES, CATEGORY_ORDER, categoryLabel, type InfraCategory } from '@bce/shared';
+import { useI18n } from '../../i18n';
+import { dataWarningText } from '../../i18n/format';
 import { useDatasetStats, useInfrastructure } from '../../hooks/data';
 import { fmtDate, fmtDateTime, fmtInt, fmtKm } from '../../services/format';
 import { LineSwatch } from '../../components/LineSwatch';
@@ -39,19 +41,20 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 export function StatsPanel() {
+  const { t, lang } = useI18n();
   const { data } = useInfrastructure();
   const stats = useDatasetStats();
   const [view, setView] = useState<'chart' | 'table'>('chart');
   if (!data || !stats) {
     return (
       <Box sx={{ p: 2 }}>
-        <Alert severity="info">Statistiky budou dostupné po načtení dat o cyklistické infrastruktuře.</Alert>
+        <Alert severity="info">{t('stats.empty')}</Alert>
       </Box>
     );
   }
   const meta = data.meta;
   const infraCats = stats.byCategory.filter((c) => c.category !== 'not_infrastructure');
-  const catData = infraCats.map((c) => ({ key: c.category, name: CATEGORIES[c.category].label, km: c.geodesicLength / 1000, dedup: c.dedupLength / 1000, count: c.count }));
+  const catData = infraCats.map((c) => ({ key: c.category, name: categoryLabel(c.category, lang), km: c.geodesicLength / 1000, dedup: c.dedupLength / 1000, count: c.count }));
   const yearCats = CATEGORY_ORDER.filter((c) => stats.byYear.some((y) => y.byCategory[c]));
   const yearData = stats.byYear.map((y) => ({
     year: String(y.year),
@@ -62,25 +65,25 @@ export function StatsPanel() {
   return (
     <Stack spacing={2} sx={{ p: 2 }} data-testid="stats-panel">
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-        <Tile label="Délka záznamů (geometrie)" value={fmtKm(stats.geodesicLength)} sub="součet všech linií" />
-        <Tile label="Deduplikovaná síť" value={fmtKm(stats.dedupLength)} sub={`překryvy ${fmtKm(stats.overlapLength)}`} />
-        <Tile label="Počet prvků" value={fmtInt(stats.featureCount)} sub={meta.expectedCount ? `ve službě ${fmtInt(meta.expectedCount)}` : undefined} />
-        <Tile label="Export dat města" value={fmtDate(meta.latestExportDate)} sub={`staženo ${fmtDateTime(meta.lastRefreshed)}`} />
+        <Tile label={t('stats.recorded')} value={fmtKm(stats.geodesicLength)} sub={t('stats.recordedSub')} />
+        <Tile label={t('stats.dedup')} value={fmtKm(stats.dedupLength)} sub={t('stats.dedupSub', { v: fmtKm(stats.overlapLength) })} />
+        <Tile label={t('stats.count')} value={fmtInt(stats.featureCount)} sub={meta.expectedCount ? t('stats.countSub', { v: fmtInt(meta.expectedCount) }) : undefined} />
+        <Tile label={t('stats.export')} value={fmtDate(meta.latestExportDate)} sub={t('stats.exportSub', { v: fmtDateTime(meta.lastRefreshed) })} />
       </Box>
       <Typography variant="caption" color="text.secondary">
-        „Délka záznamů“ je součet geodetických délek všech linií (atribut <code>delka</code> dává {fmtKm(stats.recordedLength)}). „Deduplikovaná síť“ počítá
-        každé místo jen jednou – úseky, kde se linie překrývají (do 3 m a souběžně), se nezapočítají dvakrát. Nezahrnuje záznamy „Úsek byl zrušen“ a „Vjezd
-        cyklistům zakázán“.
+        {t('stats.explainA')}
+        <code>delka</code>
+        {t('stats.explainB', { v: fmtKm(stats.recordedLength) })}
       </Typography>
 
       <Box>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Typography variant="subtitle2" sx={{ flex: 1 }}>
-            Délka podle kategorie
+            {t('stats.byCategory')}
           </Typography>
-          <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)} aria-label="Zobrazení">
-            <ToggleButton value="chart">Graf</ToggleButton>
-            <ToggleButton value="table">Tabulka</ToggleButton>
+          <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)} aria-label={t('stats.view')}>
+            <ToggleButton value="chart">{t('stats.chart')}</ToggleButton>
+            <ToggleButton value="table">{t('stats.table')}</ToggleButton>
           </ToggleButtonGroup>
         </Box>
         {view === 'chart' ? (
@@ -95,8 +98,8 @@ export function StatsPanel() {
                   labelStyle={{ color: '#f0efec' }}
                   itemStyle={{ color: '#f0efec' }}
                   formatter={(_v: number, _n: string, item: { payload?: { km: number; dedup: number; count: number } }) => [
-                    `${fmtKm((item.payload?.km ?? 0) * 1000)} (dedup. ${fmtKm((item.payload?.dedup ?? 0) * 1000)}, ${item.payload?.count} prvků)`,
-                    'Délka',
+                    t('stats.tooltip', { km: fmtKm((item.payload?.km ?? 0) * 1000), dedup: fmtKm((item.payload?.dedup ?? 0) * 1000), count: item.payload?.count }),
+                    t('stats.length'),
                   ]}
                 />
                 <Bar dataKey="km" radius={[0, 4, 4, 0]} isAnimationActive={false}>
@@ -108,13 +111,13 @@ export function StatsPanel() {
             </ResponsiveContainer>
           </Box>
         ) : (
-          <Table size="small" sx={{ mt: 1 }} aria-label="Délka podle kategorie">
+          <Table size="small" sx={{ mt: 1 }} aria-label={t('stats.byCategory')}>
             <TableHead>
               <TableRow>
-                <TableCell>Kategorie</TableCell>
-                <TableCell align="right">Prvků</TableCell>
-                <TableCell align="right">Geometrie</TableCell>
-                <TableCell align="right">Dedup.</TableCell>
+                <TableCell>{t('stats.col.category')}</TableCell>
+                <TableCell align="right">{t('stats.col.count')}</TableCell>
+                <TableCell align="right">{t('stats.col.geometry')}</TableCell>
+                <TableCell align="right">{t('stats.col.dedup')}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -123,7 +126,7 @@ export function StatsPanel() {
                   <TableCell sx={{ fontSize: 12 }}>
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                       <LineSwatch category={c.category} width={20} />
-                      {CATEGORIES[c.category].label}
+                      {categoryLabel(c.category, lang)}
                     </Box>
                   </TableCell>
                   <TableCell align="right" sx={{ fontSize: 12 }}>{c.count}</TableCell>
@@ -138,7 +141,7 @@ export function StatsPanel() {
 
       {yearData.length > 0 && (
         <Box>
-          <Typography variant="subtitle2">Realizace podle roku (km, dle rok_realizace)</Typography>
+          <Typography variant="subtitle2">{t('stats.byYear')}</Typography>
           <Box sx={{ height: 230, mt: 1 }}>
             <ResponsiveContainer>
               <BarChart data={yearData} margin={{ left: -18, right: 4, top: 4, bottom: 0 }} barCategoryGap={2}>
@@ -150,9 +153,9 @@ export function StatsPanel() {
                   contentStyle={tooltipStyle}
                   labelStyle={{ color: '#f0efec' }}
                   itemStyle={{ color: '#f0efec' }}
-                  formatter={(v: number, name: string) => [fmtKm(v * 1000), CATEGORIES[name as InfraCategory]?.label ?? name]}
+                  formatter={(v: number, name: string) => [fmtKm(v * 1000), CATEGORIES[name as InfraCategory] ? categoryLabel(name as InfraCategory, lang) : name]}
                 />
-                <Legend wrapperStyle={{ fontSize: 10.5 }} formatter={(v: string) => <span style={{ color: '#c3c2b7' }}>{CATEGORIES[v as InfraCategory]?.label ?? v}</span>} />
+                <Legend wrapperStyle={{ fontSize: 10.5 }} formatter={(v: string) => <span style={{ color: '#c3c2b7' }}>{CATEGORIES[v as InfraCategory] ? categoryLabel(v as InfraCategory, lang) : v}</span>} />
                 {yearCats.map((c) => (
                   <Bar key={c} dataKey={c} stackId="y" fill={CATEGORIES[c].colorDark} stroke="#151f2e" strokeWidth={1} isAnimationActive={false} />
                 ))}
@@ -161,17 +164,16 @@ export function StatsPanel() {
           </Box>
           {stats.missingYearCount > 0 && (
             <Typography variant="caption" color="text.secondary">
-              {stats.missingYearCount} záznamů nemá vyplněný rok realizace.
+              {t('stats.missingYear', { count: stats.missingYearCount })}
             </Typography>
           )}
         </Box>
       )}
 
       <Alert severity="info" variant="outlined" sx={{ '& .MuiAlert-message': { fontSize: 12 } }}>
-        <b>Pokrytí a omezení dat:</b> Datová sada „Realizovaná cykloopatření“ obsahuje opatření evidovaná městem Brnem. Nezahrnuje všechny cesty, po kterých je
-        jízda na kole povolená (např. lesní a polní cesty, klidné ulice bez opatření, okolní obce). Absence záznamu neznamená, že úsek je nebezpečný či
-        nesjízdný. Kategorie jsou odvozeny z atributu <code>typ_opatreni</code>.
-        {meta.schemaWarnings.length > 0 && <div>Upozornění ke schématu: {meta.schemaWarnings.join(' ')}</div>}
+        <b>{t('stats.coverageTitle')}</b> {t('stats.coverage')}
+        <code>typ_opatreni</code>.
+        {meta.schemaWarnings.length > 0 && <div>{t('stats.schemaWarnings', { list: meta.schemaWarnings.map((w) => dataWarningText(w, t)).join(' ') })}</div>}
       </Alert>
     </Stack>
   );

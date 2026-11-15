@@ -16,7 +16,7 @@ export function registerInfrastructureRoutes(app: FastifyInstance, { infrastruct
       return infrastructure.get();
     } catch (e) {
       reply.status(502);
-      return { error: e instanceof Error ? e.message : String(e), meta: infrastructure.getMeta() };
+      return { error: e instanceof Error ? e.message : String(e), code: 'data_unavailable', meta: infrastructure.getMeta() };
     }
   });
 
@@ -26,7 +26,7 @@ export function registerInfrastructureRoutes(app: FastifyInstance, { infrastruct
       return infrastructure.get();
     } catch (e) {
       reply.status(400);
-      return { error: e instanceof Error ? e.message : String(e) };
+      return { error: e instanceof Error ? e.message : String(e), code: 'import_invalid' };
     }
   });
 }

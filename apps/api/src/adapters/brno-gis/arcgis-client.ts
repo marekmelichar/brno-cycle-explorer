@@ -1,3 +1,5 @@
+import type { DataWarning } from '@bce/shared';
+
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface ArcGisLayerMetadata {
@@ -13,7 +15,7 @@ export interface ArcGisFetchResult {
   metadata: ArcGisLayerMetadata;
   expectedCount: number;
   featureCollection: { type: 'FeatureCollection'; features: unknown[] };
-  warnings: string[];
+  warnings: DataWarning[];
 }
 
 export class ArcGisError extends Error {
@@ -117,10 +119,10 @@ export class ArcGisClient {
   }
 
   async fetchAll(): Promise<ArcGisFetchResult> {
-    const warnings: string[] = [];
+    const warnings: DataWarning[] = [];
     const metadata = await this.getMetadata();
-    if (!/geojson/i.test(metadata.supportedQueryFormats)) warnings.push('Služba neuvádí podporu formátu GeoJSON.');
-    if (metadata.geometryType && metadata.geometryType !== 'esriGeometryPolyline') warnings.push(`Neočekávaný typ geometrie: ${metadata.geometryType}`);
+    if (!/geojson/i.test(metadata.supportedQueryFormats)) warnings.push({ code: 'no_geojson_support' });
+    if (metadata.geometryType && metadata.geometryType !== 'esriGeometryPolyline') warnings.push({ code: 'unexpected_geometry', type: metadata.geometryType });
     const ids = await this.getObjectIds();
     const batchSize = Math.max(1, Math.min(this.opts.batchSize, metadata.maxRecordCount));
     const batches: number[][] = [];
@@ -146,7 +148,7 @@ export class ArcGisClient {
     if (unique.length !== ids.length) {
       const msg = `Staženo ${unique.length} z ${ids.length} záznamů – odpověď služby je neúplná.`;
       if (unique.length < ids.length * 0.98) throw new ArcGisError(msg);
-      warnings.push(msg);
+      warnings.push({ code: 'partial', received: unique.length, expected: ids.length });
     }
     return { metadata, expectedCount: ids.length, featureCollection: { type: 'FeatureCollection', features: unique }, warnings };
   }

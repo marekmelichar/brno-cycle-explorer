@@ -3,13 +3,14 @@ import { DEFAULT_MATCH_OPTIONS, type MatchOptions } from '@bce/geo';
 import { useAppConfig } from '../hooks/data';
 import { useAppStore } from '../store/useAppStore';
 import { useNotify } from './Notifier';
+import { setLang, useI18n } from '../i18n';
 
 const FIELDS: Array<{ key: keyof MatchOptions; label: string; help: string; min: number; max: number; step: number; unit: string }> = [
-  { key: 'tolerance', label: 'Tolerance vzdálenosti', help: 'Max. boční odstup trasy od linie opatření.', min: 3, max: 40, step: 1, unit: 'm' },
-  { key: 'maxAngle', label: 'Max. odchylka směru', help: 'Větší odchylka = křížení, ne souběh.', min: 10, max: 60, step: 5, unit: '°' },
-  { key: 'step', label: 'Délka analyzovaného kroku', help: 'Trasa se dělí na úseky této délky.', min: 2, max: 25, step: 1, unit: 'm' },
-  { key: 'maxGapFill', label: 'Překlenutí mezer', help: 'Mezery mezi úseky stejné kategorie do této délky se přiřadí (střední jistota).', min: 0, max: 30, step: 1, unit: 'm' },
-  { key: 'minRunLength', label: 'Min. délka souběhu', help: 'Kratší souběhy se považují za šum / křížení.', min: 0, max: 60, step: 5, unit: 'm' },
+  { key: 'tolerance', label: 'settings.f.tolerance.label', help: 'settings.f.tolerance.help', min: 3, max: 40, step: 1, unit: 'm' },
+  { key: 'maxAngle', label: 'settings.f.maxAngle.label', help: 'settings.f.maxAngle.help', min: 10, max: 60, step: 5, unit: '°' },
+  { key: 'step', label: 'settings.f.step.label', help: 'settings.f.step.help', min: 2, max: 25, step: 1, unit: 'm' },
+  { key: 'maxGapFill', label: 'settings.f.maxGapFill.label', help: 'settings.f.maxGapFill.help', min: 0, max: 30, step: 1, unit: 'm' },
+  { key: 'minRunLength', label: 'settings.f.minRunLength.label', help: 'settings.f.minRunLength.help', min: 0, max: 60, step: 5, unit: 'm' },
 ];
 
 export function SettingsDialog() {
@@ -20,34 +21,48 @@ export function SettingsDialog() {
   const reset = useAppStore((s) => s.resetSettings);
   const { data: config } = useAppConfig();
   const notify = useNotify();
+  const { t, lang } = useI18n();
   return (
     <Dialog open={open} onClose={() => set({ settingsOpen: false })} maxWidth="xs" fullWidth>
-      <DialogTitle>Nastavení</DialogTitle>
+      <DialogTitle>{t('settings.title')}</DialogTitle>
       <DialogContent>
+        <TextField
+          select
+          fullWidth
+          size="small"
+          label={t('top.language')}
+          value={lang}
+          onChange={(e) => setLang(e.target.value as 'cs' | 'en')}
+          sx={{ mt: 1, mb: 2 }}
+          data-testid="lang-select"
+        >
+          <MenuItem value="cs">Čeština</MenuItem>
+          <MenuItem value="en">English</MenuItem>
+        </TextField>
         {config && (
           <TextField
             select
             fullWidth
             size="small"
-            label="Mapový podklad"
+            label={t('top.basemap')}
             value={basemapId ?? config.defaultBasemap}
             onChange={(e) => set({ basemapId: e.target.value })}
             sx={{ mt: 1, mb: 2 }}
           >
             {config.basemaps.map((b) => (
               <MenuItem key={b.id} value={b.id}>
-                {b.label}
+                {t(`basemap.${b.id}`, { defaultValue: b.label })}
               </MenuItem>
             ))}
           </TextField>
         )}
         <Typography variant="subtitle2" gutterBottom>
-          Párování trasy s infrastrukturou
+          {t('settings.matching')}
         </Typography>
         {FIELDS.map((f) => (
           <Box key={f.key} sx={{ mb: 1 }}>
             <Typography variant="body2" id={`set-${f.key}`}>
-              {f.label}: <b>{opts[f.key]} {f.unit}</b>
+              {t(f.label)}: <b>{opts[f.key]} {f.unit}</b>
             </Typography>
             <Slider
               size="small"
@@ -59,7 +74,7 @@ export function SettingsDialog() {
               aria-labelledby={`set-${f.key}`}
             />
             <Typography variant="caption" color="text.secondary">
-              {f.help} Výchozí: {DEFAULT_MATCH_OPTIONS[f.key]} {f.unit}
+              {t(f.help)} {t('settings.default')}: {DEFAULT_MATCH_OPTIONS[f.key]} {f.unit}
             </Typography>
           </Box>
         ))}
@@ -71,14 +86,14 @@ export function SettingsDialog() {
             localStorage.removeItem('bce-settings-v1');
             set({ savedRoutes: [] });
             reset();
-            notify('Lokálně uložená data byla smazána.', 'success');
+            notify(t('settings.cleared'), 'success');
           }}
         >
-          Smazat lokální data
+          {t('settings.clearLocal')}
         </Button>
-        <Button onClick={reset}>Výchozí</Button>
+        <Button onClick={reset}>{t('settings.reset')}</Button>
         <Button variant="contained" onClick={() => set({ settingsOpen: false })}>
-          Hotovo
+          {t('settings.done')}
         </Button>
       </DialogActions>
     </Dialog>

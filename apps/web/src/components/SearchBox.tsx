@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Autocomplete, CircularProgress, InputAdornment, TextField } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import type { GeocodeResult } from '@bce/shared';
-import { api } from '../services/api';
+import { api, apiErrorText } from '../services/api';
+import { useI18n } from '../i18n';
 
 interface Props {
   onSelect: (r: GeocodeResult) => void;
@@ -13,7 +14,9 @@ interface Props {
 }
 
 /** Debounced (600 ms, ≥ 3 characters) geocoding – requests only while the user types. */
-export function SearchBox({ onSelect, placeholder = 'Hledat místo nebo adresu v Brně…', size = 'small', autoFocus }: Props) {
+export function SearchBox({ onSelect, placeholder: placeholderProp, size = 'small', autoFocus }: Props) {
+  const { t } = useI18n();
+  const placeholder = placeholderProp ?? t('search.placeholder');
   const [input, setInput] = useState('');
   const [options, setOptions] = useState<GeocodeResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,20 +30,22 @@ export function SearchBox({ onSelect, placeholder = 'Hledat místo nebo adresu v
       return;
     }
     const ctrl = new AbortController();
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await api.geocode(q, ctrl.signal);
+        const map = (window as unknown as { __bceMap?: { getBounds(): { toArray(): number[][] } } }).__bceMap;
+        const b = map?.getBounds().toArray();
+        const res = await api.geocode(q, ctrl.signal, b ? [b[0][0], b[0][1], b[1][0], b[1][1]] : undefined);
         setOptions(res.results);
-        setError(res.results.length ? null : 'Nic nenalezeno.');
+        setError(res.results.length ? null : t('search.nothing'));
       } catch (e) {
-        if ((e as Error).name !== 'AbortError') setError((e as Error).message);
+        if ((e as Error).name !== 'AbortError') setError(apiErrorText(e, t));
       } finally {
         setLoading(false);
       }
     }, 600);
     return () => {
-      clearTimeout(t);
+      clearTimeout(timer);
       ctrl.abort();
     };
   }, [input]);
@@ -52,9 +57,9 @@ export function SearchBox({ onSelect, placeholder = 'Hledat místo nebo adresu v
       filterOptions={(x) => x}
       getOptionLabel={(o) => o.label}
       isOptionEqualToValue={(a, b) => a.id === b.id}
-      noOptionsText={error ?? (input.trim().length < 3 ? 'Zadejte alespoň 3 znaky' : 'Hledám…')}
+      noOptionsText={error ?? (input.trim().length < 3 ? t('search.minChars') : t('search.searching'))}
       loading={loading}
-      loadingText="Hledám…"
+      loadingText={t('search.searching')}
       onInputChange={(_, v, reason) => reason !== 'reset' && setInput(v)}
       onChange={(_, v) => v && onSelect(v)}
       blurOnSelect

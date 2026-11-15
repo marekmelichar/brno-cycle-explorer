@@ -19,17 +19,20 @@ import {
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CloseIcon from '@mui/icons-material/Close';
-import { CATEGORIES, UNMATCHED_COLOR } from '@bce/shared';
+import { CATEGORIES, UNMATCHED_COLOR, categoryLabel } from '@bce/shared';
 import { useActiveAnalysis } from '../../hooks/data';
 import { useAppStore } from '../../store/useAppStore';
 import { fmtDistance, fmtKm, fmtPct } from '../../services/format';
 import { GroupBar, QualityChip } from '../../components/RouteStats';
 import { linesBounds } from '../../services/geometry';
 import { sectionLabel, sectionOsm } from '../../services/osm';
+import { useI18n } from '../../i18n';
+import { reasonText, rejectText } from '../../i18n/format';
 
-const KIND_LABEL = { gpx: 'Importovaná GPX stopa', calculated: 'Vypočtená trasa (OSM)', manual: 'Ručně nakreslená trasa (nenavigovaná)' } as const;
+const KIND_LABEL = { gpx: 'kind.gpx', calculated: 'kind.calculated', manual: 'kind.manual' } as const;
 
 export function SectionDetail() {
+  const { t, lang } = useI18n();
   const analysis = useActiveAnalysis();
   const id = useAppStore((s) => s.selectedSectionId);
   const set = useAppStore((s) => s.set);
@@ -39,26 +42,29 @@ export function SectionDetail() {
   const osm = sectionOsm(active, analysis, sec);
   const pieces = analysis.pieces.filter((p) => p.startDistance >= sec.startDistance - 0.01 && p.startDistance < sec.startDistance + sec.length - 0.01);
   const cands = new Map<number, { cat: string; reason?: string; d: number; a: number; acc: boolean }>();
-  for (const p of pieces) for (const c of p.candidates) if (!cands.has(c.featureId)) cands.set(c.featureId, { cat: CATEGORIES[c.category].label, reason: c.rejectReason, d: c.distance, a: c.angle, acc: c.accepted });
+  for (const p of pieces)
+    for (const c of p.candidates)
+      if (!cands.has(c.featureId))
+        cands.set(c.featureId, { cat: categoryLabel(c.category, lang), reason: c.reject ? rejectText(c.reject, t) : undefined, d: c.distance, a: c.angle, acc: c.accepted });
   return (
     <Box sx={{ p: 1.5, borderLeft: { md: '1px solid' }, borderColor: { md: 'divider' }, minWidth: 0 }} data-testid="section-detail">
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <Box sx={{ width: 12, height: 12, borderRadius: '2px', bgcolor: sec.category ? CATEGORIES[sec.category].color : UNMATCHED_COLOR }} />
         <Typography variant="subtitle2" sx={{ flex: 1 }}>
-          Úsek {sec.id + 1}: {sec.label}
+          {t('section.title', { n: sec.id + 1, label: sectionLabel(active, analysis, sec) })}
         </Typography>
-        <IconButton size="small" aria-label="Zavřít detail úseku" onClick={() => set({ selectedSectionId: null })}>
+        <IconButton size="small" aria-label={t('section.close')} onClick={() => set({ selectedSectionId: null })}>
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
       <Typography variant="caption" color="text.secondary" component="div">
-        {fmtDistance(sec.length)} od {fmtKm(sec.startDistance)} · jistota: {sec.confidence === 'high' ? 'vysoká' : sec.confidence === 'medium' ? 'střední' : '—'}
-        {sec.meanDistance !== null && ` · průměrný odstup ${sec.meanDistance.toFixed(1)} m`}
-        {sec.maxAngle !== null && ` · max. odchylka směru ${sec.maxAngle.toFixed(0)}°`}
-        {sec.featureIds.length > 0 && ` · záznamy #${sec.featureIds.slice(0, 6).join(', #')}`}
+        {t('section.meta', { len: fmtDistance(sec.length), from: fmtKm(sec.startDistance), conf: sec.confidence === 'none' ? '—' : t(`conf.${sec.confidence}`) })}
+        {sec.meanDistance !== null && t('section.meanDist', { v: sec.meanDistance.toFixed(1) })}
+        {sec.maxAngle !== null && t('section.maxAngle', { v: sec.maxAngle.toFixed(0) })}
+        {sec.featureIds.length > 0 && t('section.records', { ids: sec.featureIds.slice(0, 6).join(', #') })}
       </Typography>
       <Typography variant="body2" sx={{ mt: 0.5, fontSize: 12.5 }}>
-        Proč: {sec.reasons[0]}
+        {t('section.why', { text: reasonText(sec.reasons[0], t, lang) })}
       </Typography>
       {osm && (
         <Box sx={{ mt: 0.75, p: 1, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.04)' }} data-testid="section-osm">
@@ -72,30 +78,31 @@ export function SectionDetail() {
               .join(' · ')}
           </Typography>
           <Typography variant="caption" color="text.secondary" component="div">
-            Data OSM z vypočtené trasy (BRouter){osm.share < 0.9 ? `, pokrývá ${Math.round(osm.share * 100)} % úseku` : ''}. Nejde o oficiální záznam města.
+            {t('section.osmSource', { cover: osm.share < 0.9 ? t('section.osmCover', { v: Math.round(osm.share * 100) }) : '' })}
           </Typography>
         </Box>
       )}
       {cands.size > 0 && (
         <Box sx={{ mt: 0.5 }}>
           <Typography variant="caption" color="text.secondary">
-            Posouzené blízké záznamy:
+            {t('section.candidates')}
           </Typography>
           {[...cands.entries()].slice(0, 5).map(([fid, c]) => (
             <Typography key={fid} variant="caption" component="div" sx={{ color: c.acc ? 'success.light' : 'text.secondary' }}>
-              #{fid} {c.cat}: {c.d.toFixed(1)} m, {c.a.toFixed(0)}° – {c.acc ? 'vyhovuje' : `zamítnuto (${c.reason})`}
+              #{fid} {c.cat}: {c.d.toFixed(1)} m, {c.a.toFixed(0)}° – {c.acc ? t('section.ok') : t('section.rejected', { why: c.reason })}
             </Typography>
           ))}
         </Box>
       )}
       <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.5 }}>
-        Klasifikace je geometricky odvozená z polohy trasy vůči oficiálním záznamům, nejde o ověření v terénu.
+        {t('section.disclaimer')}
       </Typography>
     </Box>
   );
 }
 
 export function AnalysisPanel() {
+  const { t } = useI18n();
   const active = useAppStore((s) => s.activeRoute);
   const open = useAppStore((s) => s.analysisOpen);
   const selectedId = useAppStore((s) => s.selectedSectionId);
@@ -118,7 +125,7 @@ export function AnalysisPanel() {
         <Typography variant="subtitle2" noWrap sx={{ maxWidth: 260 }}>
           {active.name}
         </Typography>
-        <Chip size="small" variant="outlined" label={active.kind === 'calculated' && active.meta?.variant ? `Vypočtená trasa · ${String(active.meta.variant).split(':')[0]}` : KIND_LABEL[active.kind]} />
+        <Chip size="small" variant="outlined" label={active.kind === 'calculated' && active.meta?.variant ? t('kind.calculatedBy', { engine: String(active.meta.variant).split(':')[0] }) : t(KIND_LABEL[active.kind])} />
         {analysis ? (
           <>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -128,17 +135,17 @@ export function AnalysisPanel() {
               <GroupBar analysis={analysis} height={10} />
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', display: { xs: 'none', lg: 'block' } }}>
-              stezky mimo vozovku {fmtPct((analysis.byGroup.find((g) => g.key === 'dedicated')?.share ?? 0) + (analysis.byGroup.find((g) => g.key === 'shared')?.share ?? 0))}
+              {t('analysis.offRoad', { pct: fmtPct((analysis.byGroup.find((g) => g.key === 'dedicated')?.share ?? 0) + (analysis.byGroup.find((g) => g.key === 'shared')?.share ?? 0)) })}
             </Typography>
             <QualityChip analysis={analysis} />
           </>
         ) : (
           <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
-            Analýza není k dispozici (chybí data infrastruktury).
+            {t('analysis.unavailable')}
           </Typography>
         )}
-        <Tooltip title={open ? 'Sbalit analýzu' : 'Rozbalit analýzu úseků'}>
-          <IconButton size="small" onClick={() => set({ analysisOpen: !open })} aria-label={open ? 'Sbalit analýzu' : 'Rozbalit analýzu'} aria-expanded={open}>
+        <Tooltip title={open ? t('analysis.collapse') : t('analysis.expandTip')}>
+          <IconButton size="small" onClick={() => set({ analysisOpen: !open })} aria-label={open ? t('analysis.collapse') : t('analysis.expand')} aria-expanded={open}>
             {open ? <ExpandMoreIcon /> : <ExpandLessIcon />}
           </IconButton>
         </Tooltip>
@@ -146,14 +153,14 @@ export function AnalysisPanel() {
       <Collapse in={open && !!analysis}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: selectedId !== null ? '1fr 380px' : '1fr' }, maxHeight: 230, borderTop: '1px solid', borderColor: 'divider' }}>
           <Box sx={{ overflow: 'auto', maxHeight: 230 }}>
-            <Table size="small" stickyHeader aria-label="Úseky analyzované trasy">
+            <Table size="small" stickyHeader aria-label={t('analysis.tableAria')}>
               <TableHead>
                 <TableRow>
                   <TableCell>#</TableCell>
-                  <TableCell>Klasifikace</TableCell>
-                  <TableCell align="right">Od</TableCell>
-                  <TableCell align="right">Délka</TableCell>
-                  <TableCell>Jistota</TableCell>
+                  <TableCell>{t('analysis.col.class')}</TableCell>
+                  <TableCell align="right">{t('analysis.col.from')}</TableCell>
+                  <TableCell align="right">{t('analysis.col.length')}</TableCell>
+                  <TableCell>{t('analysis.col.conf')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -183,7 +190,7 @@ export function AnalysisPanel() {
                     </TableCell>
                     <TableCell align="right" sx={{ py: 0.25, fontVariantNumeric: 'tabular-nums' }}>{fmtKm(s.startDistance)}</TableCell>
                     <TableCell align="right" sx={{ py: 0.25, fontVariantNumeric: 'tabular-nums' }}>{fmtDistance(s.length)}</TableCell>
-                    <TableCell sx={{ py: 0.25 }}>{s.confidence === 'high' ? 'vysoká' : s.confidence === 'medium' ? 'střední' : '—'}</TableCell>
+                    <TableCell sx={{ py: 0.25 }}>{s.confidence === 'none' ? '—' : t(`conf.${s.confidence}`)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -198,6 +205,7 @@ export function AnalysisPanel() {
 
 /** Phone layout: compact one-line rows instead of the table; the tapped section's detail opens inline. */
 function MobileSectionList() {
+  const { t } = useI18n();
   const active = useAppStore((s) => s.activeRoute);
   const selectedId = useAppStore((s) => s.selectedSectionId);
   const set = useAppStore((s) => s.set);
@@ -207,7 +215,7 @@ function MobileSectionList() {
   return (
     <Box data-testid="analysis-panel" sx={{ borderTop: '1px solid', borderColor: 'divider', pb: 2 }}>
       <Typography variant="overline" color="text.secondary" sx={{ px: 2, display: 'block', pt: 1 }}>
-        Úseky trasy ({analysis.sections.length})
+        {t('analysis.sections', { n: analysis.sections.length })}
       </Typography>
       <List dense disablePadding data-testid="section-list">
         {analysis.sections.map((s) => (
@@ -230,8 +238,8 @@ function MobileSectionList() {
                   {sectionLabel(active, analysis, s)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" component="div">
-                  od {fmtKm(s.startDistance)}
-                  {s.confidence !== 'none' && ` · jistota ${s.confidence === 'high' ? 'vysoká' : 'střední'}`}
+                  {t('analysis.from', { v: fmtKm(s.startDistance) })}
+                  {s.confidence !== 'none' && t('analysis.conf', { v: t(`conf.${s.confidence}`) })}
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>

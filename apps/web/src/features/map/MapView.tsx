@@ -3,13 +3,14 @@ import maplibregl, { type Map as MlMap, type MapGeoJSONFeature, type StyleSpecif
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Alert, Box, Button, CircularProgress, Paper, Typography } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import { CATEGORIES, CATEGORY_ORDER, UNMATCHED_COLOR, type InfraCategory } from '@bce/shared';
+import { CATEGORIES, CATEGORY_ORDER, UNMATCHED_COLOR, categoryLabel, type InfraCategory } from '@bce/shared';
 import { useActiveAnalysis, useAppConfig, useInfrastructure } from '../../hooks/data';
 import { useAppStore } from '../../store/useAppStore';
 import { BRNO_CENTER } from '../../services/geometry';
 import { BLANK_STYLE, EMPTY_FC, INFRA_LAYER_IDS, ROUTE_LAYER_IDS, addOverlays, infraLayerId, setSourceData, type OverlayData } from './mapLayers';
 import { FeatureInspector } from './FeatureInspector';
 import { sectionLabel } from '../../services/osm';
+import i18n, { currentLang, useI18n } from '../../i18n';
 import { nameWaypoint } from '../../services/waypointNames';
 import { SeeThroughButton } from './SeeThroughButton';
 
@@ -23,17 +24,18 @@ async function fetchStyle(url: string): Promise<StyleSpecification> {
     res = await fetch(url, { signal: AbortSignal.timeout(STYLE_TIMEOUT_MS) });
   } catch (e) {
     const timeout = (e as Error)?.name === 'TimeoutError';
-    throw new Error(timeout ? 'Poskytovatel mapového podkladu neodpověděl včas.' : 'Mapový podklad je nedostupný nebo blokovaný (síť, firewall, CORS).');
+    throw new Error(timeout ? i18n.t('map.styleTimeout') : i18n.t('map.styleBlocked'));
   }
-  if (!res.ok) throw new Error(`Poskytovatel mapového podkladu vrátil chybu HTTP ${res.status}.`);
+  if (!res.ok) throw new Error(i18n.t('map.styleHttp', { status: res.status }));
   const json = (await res.json().catch(() => null)) as StyleSpecification | null;
   if (!json || json.version !== 8 || !json.sources || !Array.isArray(json.layers)) {
-    throw new Error('Odpověď poskytovatele není platný styl MapLibre.');
+    throw new Error(i18n.t('map.styleInvalid'));
   }
   return json;
 }
 
 export function MapView() {
+  const { t, lang } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
@@ -105,7 +107,7 @@ export function MapView() {
           ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: analysis.sections[0].coordinates[0] } }] }
           : EMPTY_FC,
     };
-  }, [analysis, activeRoute, infra, candidates, selectedCandidateId, manualLine, selectedSectionId]);
+  }, [analysis, activeRoute, infra, candidates, selectedCandidateId, manualLine, selectedSectionId, lang]);
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
 
@@ -180,8 +182,8 @@ export function MapView() {
       new maplibregl.AttributionControl({
         compact: true,
         customAttribution: [
-          'Cykloopatření: © <a href="https://data.brno.cz" target="_blank" rel="noreferrer">Statutární město Brno</a>',
-          'Trasy: BRouter / Valhalla, data © OpenStreetMap',
+          i18n.t('map.attrCity'),
+          i18n.t('map.attrRouting'),
         ],
       }),
       'bottom-right',
@@ -246,9 +248,9 @@ export function MapView() {
       const isEnd = i === waypoints.length - 1 && waypoints.length > 1;
       el.className = 'bce-waypoint';
       el.style.background = isStart ? '#16a34a' : isEnd ? '#dc2626' : '#0ea5e9';
-      el.textContent = isStart ? 'S' : isEnd ? 'C' : String(i);
-      el.title = `${w.name} – přetažením přesunete`;
-      el.setAttribute('aria-label', `Bod trasy: ${w.name}`);
+      el.textContent = isStart ? i18n.t('wp.start') : isEnd ? i18n.t('wp.end') : String(i);
+      el.title = i18n.t('map.waypointTitle', { name: w.name });
+      el.setAttribute('aria-label', i18n.t('map.waypointAria', { name: w.name }));
       const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(w.position).addTo(map);
       marker.on('dragend', () => {
         const p = marker.getLngLat();
@@ -257,7 +259,7 @@ export function MapView() {
       });
       return marker;
     });
-  }, [waypoints]);
+  }, [waypoints, lang]);
 
   // ---------- fit bounds ----------
   useEffect(() => {
@@ -329,13 +331,13 @@ export function MapView() {
       if (route.length) {
         map.getCanvas().style.cursor = 'pointer';
         setHover(null);
-        setHoverInfo({ x: e.point.x, y: e.point.y, label: `Analyzovaná trasa: ${route[0].properties.label}` });
+        setHoverInfo({ x: e.point.x, y: e.point.y, label: i18n.t('map.hoverRoute', { label: route[0].properties.label }) });
       } else if (feats.length) {
         const f = feats[0];
         map.getCanvas().style.cursor = 'pointer';
         setHover(Number(f.properties.id));
         const cat = f.properties.category as InfraCategory;
-        setHoverInfo({ x: e.point.x, y: e.point.y, label: `${CATEGORIES[cat]?.label ?? cat} · ${f.properties.originalType ?? 'typ neuveden'}` });
+        setHoverInfo({ x: e.point.x, y: e.point.y, label: `${CATEGORIES[cat] ? categoryLabel(cat, currentLang()) : cat} · ${f.properties.originalType ?? i18n.t('map.noType')}` });
       } else {
         map.getCanvas().style.cursor = '';
         setHover(null);
@@ -364,12 +366,12 @@ export function MapView() {
   const showError = styleStatus.status === 'error' || !!configError;
   return (
     <Box sx={{ position: 'relative', width: '100%', height: '100%', bgcolor: '#dfe4ea' }}>
-      <Box ref={containerRef} data-testid="map-container" sx={{ position: 'absolute', inset: 0 }} role="region" aria-label="Interaktivní mapa" />
+      <Box ref={containerRef} data-testid="map-container" sx={{ position: 'absolute', inset: 0 }} role="region" aria-label={t('map.region')} />
 
       {styleStatus.status === 'loading' && (
         <Paper elevation={3} sx={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', px: 2, py: 1, display: 'flex', gap: 1, alignItems: 'center' }}>
           <CircularProgress size={16} />
-          <Typography variant="body2">Načítám mapový podklad…</Typography>
+          <Typography variant="body2">{t('map.loadingStyle')}</Typography>
         </Paper>
       )}
 
@@ -381,16 +383,16 @@ export function MapView() {
         >
           <Paper sx={{ p: 3, maxWidth: 440 }}>
             <Typography variant="h6" gutterBottom>
-              Mapový podklad se nepodařilo načíst
+              {t('map.styleFailed')}
             </Typography>
             <Typography variant="body2" color="text.secondary" paragraph>
-              {configError ? 'Nelze načíst konfiguraci aplikace ze serveru API.' : styleStatus.message}
+              {configError ? t('map.configFailed') : styleStatus.message}
             </Typography>
             <Typography variant="body2" color="text.secondary" paragraph>
-              Poskytovatel: {basemap?.label ?? '–'}. Můžete to zkusit znovu, nebo v nastavení zvolit jiný podklad. Vrstvy cykloinfrastruktury zůstávají k dispozici.
+              {t('map.providerHelp', { name: basemap ? t(`basemap.${basemap.id}`, { defaultValue: basemap.label }) : '–' })}
             </Typography>
             <Button variant="contained" startIcon={<RefreshIcon />} onClick={() => (configError ? refetchConfig() : loadBasemap())}>
-              Zkusit znovu
+              {t('map.retry')}
             </Button>
           </Paper>
         </Box>
@@ -402,11 +404,11 @@ export function MapView() {
           sx={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 4, maxWidth: 'calc(100% - 120px)' }}
           action={
             <Button color="inherit" size="small" onClick={loadBasemap}>
-              Znovu
+              {t('map.again')}
             </Button>
           }
         >
-          Část dlaždic mapového podkladu se nenačítá.
+          {t('map.tilesFailing')}
         </Alert>
       )}
 
@@ -434,7 +436,7 @@ export function MapView() {
       {tab === 'planner' && ((plannerMode === 'auto' && waypoints.length === 0) || (plannerMode === 'manual' && manualLine.length === 0)) && (
         <Paper sx={{ position: 'absolute', top: 12, left: 12, px: 1.5, py: 0.75, zIndex: 2, maxWidth: 'calc(100% - 80px)' }} elevation={3} data-testid="planner-hint">
           <Typography variant="caption">
-            {plannerMode === 'auto' ? 'Klepněte do mapy pro start trasy.' : 'Ruční kreslení: klepáním přidávejte vrcholy čáry.'}
+            {plannerMode === 'auto' ? t('map.hintAuto') : t('map.hintManual')}
           </Typography>
         </Paper>
       )}
