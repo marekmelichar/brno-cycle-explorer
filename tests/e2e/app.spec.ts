@@ -243,3 +243,37 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test('loop of a chosen length: one start point + target km → loops in several directions', async ({ page }) => {
+  const errors = collectConsoleErrors(page);
+  await page.goto('/');
+  await waitForMapReady(page);
+  const cfg = await page.evaluate(() => fetch('/api/config').then((r) => r.json()));
+  test.skip(!cfg.routing.available, 'routing not configured');
+  await page.getByTestId('tab-planner').click();
+  await page.getByText('Okruh (návrat do startu)').click();
+  const slider = page.getByTestId('loop-length').getByRole('slider');
+  await slider.focus();
+  // 25 km default → 15 km
+  for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('loop-length')).toContainText('15 km');
+  await expect(page.getByTestId('planner-status')).toContainText('start okruhu');
+  // one tap = the start; loops are proposed automatically
+  const box = (await page.getByTestId('map-container').boundingBox())!;
+  const p = await page.evaluate(() => (window as any).__bceMap.project([16.6428, 49.2104]));
+  await page.mouse.click(box.x + p.x, box.y + p.y);
+  const cand = page.getByTestId('candidates');
+  await expect(cand).toContainText('Okruh na', { timeout: 120_000 });
+  const kms = await cand.locator('b').allInnerTexts();
+  const values = kms.map((s) => s.match(/^(\d+),(\d) km$/)).filter(Boolean).map((m) => Number(`${m![1]}.${m![2]}`));
+  console.log('loop lengths (km):', values.join(', '));
+  expect(values.length).toBeGreaterThanOrEqual(2);
+  for (const v of values) {
+    expect(v).toBeGreaterThan(15 * 0.75);
+    expect(v).toBeLessThan(15 * 1.25);
+  }
+  await expect(cand).toContainText('cíl 15,0 km');
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: 'tests/screenshots/desktop-loops.png' });
+  expect(errors).toEqual([]);
+});

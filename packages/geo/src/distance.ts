@@ -87,3 +87,14 @@ export function undirectedAngleDiff(b1: number, b2: number): number {
   if (d > 90) d = 180 - d;
   return d;
 }
+
+/** Point reached from `start` going `dist` metres along initial `bearingDeg` (great circle). */
+export function destination(start: LngLat, bearingDeg: number, dist: number): LngLat {
+  const δ = dist / EARTH_RADIUS_M;
+  const θ = toRad(bearingDeg);
+  const φ1 = toRad(start[1]);
+  const λ1 = toRad(start[0]);
+  const φ2 = Math.asin(Math.sin(φ1) * Math.cos(δ) + Math.cos(φ1) * Math.sin(δ) * Math.cos(θ));
+  const λ2 = λ1 + Math.atan2(Math.sin(θ) * Math.sin(δ) * Math.cos(φ1), Math.cos(δ) - Math.sin(φ1) * Math.sin(φ2));
+  return [((toDeg(λ2) + 540) % 360) - 180, toDeg(φ2)];
+}

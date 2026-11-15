@@ -79,6 +79,8 @@ interface State {
   preference: RoutePreference;
   /** Routing engine chosen in the planner (null = server default). */
   engine: string | null;
+  /** Desired loop length (km) for round trips planned from a single start. */
+  targetKm: number;
   /** Waypoints or route options changed since the last calculation: the planner recalculates automatically. */
   routeDirty: boolean;
   candidates: RouteCandidate[];
@@ -131,6 +133,7 @@ export const useAppStore = create<State>()(
       rideType: 'ebike',
       preference: 'max_paths',
       engine: null,
+      targetKm: 25,
       routeDirty: false,
       candidates: [],
       selectedCandidateId: null,
@@ -192,6 +195,7 @@ export const useAppStore = create<State>()(
         rideType: s.rideType,
         preference: s.preference,
         engine: s.engine,
+        targetKm: s.targetKm,
         savedRoutes: s.savedRoutes,
       }),
       merge: (persisted, current) => {

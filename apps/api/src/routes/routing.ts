@@ -10,7 +10,7 @@ const schema = {
     properties: {
       waypoints: {
         type: 'array',
-        minItems: 2,
+        minItems: 1,
         maxItems: 20,
         items: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } },
       },
@@ -18,12 +18,18 @@ const schema = {
       preference: { type: 'string', enum: ['max_paths', 'min_roads', 'min_climb', 'shortest'] },
       roundTrip: { type: 'boolean' },
       engine: { type: 'string', enum: ['brouter', 'valhalla'] },
+      targetDistance: { type: 'number', minimum: 3000, maximum: 150000 },
     },
   },
 } as const;
 
 export function registerRoutingRoutes(app: FastifyInstance, { routing }: AppDeps) {
   app.post<{ Body: RouteRequest }>('/api/route', { schema }, async (req, reply) => {
+    const loop = !!req.body.roundTrip && !!req.body.targetDistance;
+    if (req.body.waypoints.length < 2 && !loop) {
+      reply.status(400);
+      return { error: 'Zadejte alespoň start a cíl.', code: 'invalid' };
+    }
     for (const [lon, lat] of req.body.waypoints) {
       if (!(lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90)) {
         reply.status(400);

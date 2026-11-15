@@ -57,6 +57,10 @@ Web app for finding, viewing, analysing and planning bike routes in Brno. It use
     by OSM way class. These are labelled as OSM data, never as official records.
   - **Valhalla** (bicycle costing, several `use_roads`/`use_hills` variants and alternatives).
 
+  **Loops of a chosen length:** with "Okruh" (round trip) on and only a start point, a slider sets
+  the length (5–100 km). The server places helper points on a ring around the start for four
+  directions, routes them with the engine's pleasant variant, and resizes the ring once if a loop
+  misses the target by more than 10 % (`packages/geo/src/loops.ts`, `apps/api/src/adapters/routing/loops.ts`).
   The app scores every candidate by matched infrastructure, distance and climb, and lets you
   compare them. Manual drawing is clearly labelled "nenavigovaná trasa" (not a navigable route).
   You can import a GPX as a starting point, export GPX, and save routes in the browser.

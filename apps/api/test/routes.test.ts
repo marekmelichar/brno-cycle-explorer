@@ -114,6 +114,16 @@ describe('REST API', () => {
     expect(r.json()).toEqual({ label: 'Karlova, Maloměřice' });
   });
 
+  it('a single waypoint is only accepted for a round trip with a target length', async () => {
+    const { server } = await app();
+    const one = await server.inject({ method: 'POST', url: '/api/route', payload: { waypoints: [[16.6, 49.2]], rideType: 'ebike', preference: 'max_paths' } });
+    expect(one.statusCode).toBe(400);
+    const tooShort = await server.inject({ method: 'POST', url: '/api/route', payload: { waypoints: [[16.6, 49.2]], rideType: 'ebike', preference: 'max_paths', roundTrip: true, targetDistance: 1000 } });
+    expect(tooShort.statusCode).toBe(400);
+    const loop = await server.inject({ method: 'POST', url: '/api/route', payload: { waypoints: [[16.6, 49.2]], rideType: 'ebike', preference: 'max_paths', roundTrip: true, targetDistance: 20000 } });
+    expect(loop.statusCode).toBe(503); // routing not configured in this test app, but the request itself is valid
+  });
+
   it('import endpoint rejects invalid payloads', async () => {
     const { server } = await app();
     const r = await server.inject({ method: 'POST', url: '/api/infrastructure/import', payload: { hello: 'world' } });

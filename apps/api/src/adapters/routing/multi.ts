@@ -1,5 +1,6 @@
 import type { RouteRequest, RouteResponse, RoutingEngineInfo } from '@bce/shared';
 import { RoutingError, type RoutingProvider } from './types';
+import { isLoopRequest, planLoops } from './loops';
 
 const LABELS: Record<string, string> = {
   brouter: 'BRouter (profily pro klidnou jízdu)',
@@ -36,6 +37,6 @@ export class MultiRoutingProvider implements RoutingProvider {
     const id = req.engine ?? this.defaultEngine;
     const engine = this.engines.find((e) => e.id === id);
     if (!engine) return Promise.reject(new RoutingError(`Neznámý směrovač: ${id}`, 400));
-    return engine.route(req);
+    return isLoopRequest(req) ? planLoops(engine, req) : engine.route(req);
   }
 }

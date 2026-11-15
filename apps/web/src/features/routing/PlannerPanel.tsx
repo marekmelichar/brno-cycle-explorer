@@ -17,6 +17,7 @@ import {
   ListItem,
   MenuItem,
   Select,
+  Slider,
   Stack,
   Switch,
   TextField,
@@ -129,21 +130,30 @@ export function PlannerPanel() {
 
   /** fit: zoom to the result (explicit calculations); automatic recalculations keep the view. */
   const calculate = (wps = s.waypoints, fit = true) => {
-    if (wps.length < 2) {
+    const loop = s.roundTrip && wps.length === 1;
+    if (wps.length < 2 && !loop) {
       notify(t('planner.needTwo'), 'info');
       return;
     }
     s.set({ routeDirty: false });
     // TanStack Query runs per-call callbacks only for the latest mutate(): older responses are dropped.
     routeMut.mutate(
-      { waypoints: wps.map((w) => w.position), rideType: s.rideType, preference: s.preference, roundTrip: s.roundTrip, engine: engine ?? undefined },
+      {
+        waypoints: wps.map((w) => w.position),
+        rideType: s.rideType,
+        preference: s.preference,
+        roundTrip: s.roundTrip,
+        engine: engine ?? undefined,
+        ...(loop ? { targetDistance: s.targetKm * 1000 } : {}),
+      },
       { onSuccess: (res) => handleRouteResult(res, fit), onError: (e) => notify(apiErrorText(e, t), 'error') },
     );
   };
 
   // Automatic (re)calculation once there are two points, whenever points or options change.
   useEffect(() => {
-    if (!s.routeDirty || s.plannerMode !== 'auto' || !routingAvailable || s.waypoints.length < 2) return;
+    const enough = s.waypoints.length >= 2 || (s.roundTrip && s.waypoints.length === 1);
+    if (!s.routeDirty || s.plannerMode !== 'auto' || !routingAvailable || !enough) return;
     const t = setTimeout(() => calculate(useAppStore.getState().waypoints, false), 700);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -311,6 +321,26 @@ export function PlannerPanel() {
             control={<Switch size="small" checked={s.roundTrip} onChange={(e) => s.set({ roundTrip: e.target.checked, candidates: [], routeDirty: true })} />}
             label={<Typography variant="body2">{t('planner.roundTrip')}</Typography>}
           />
+          {s.roundTrip && (
+            <Box data-testid="loop-length">
+              <Typography variant="body2" id="loop-length-label">
+                {t('planner.loopLength', { km: s.targetKm })}
+              </Typography>
+              <Slider
+                size="small"
+                min={5}
+                max={100}
+                step={1}
+                value={s.targetKm}
+                onChange={(_, v) => s.set({ targetKm: v as number })}
+                onChangeCommitted={() => s.set({ candidates: [], routeDirty: true })}
+                aria-labelledby="loop-length-label"
+              />
+              <Typography variant="caption" color="text.secondary">
+                {s.waypoints.length <= 1 ? t('planner.loopHintOne') : t('planner.loopHintMany')}
+              </Typography>
+            </Box>
+          )}
           <Button variant="text" size="small" onClick={loadExample} data-testid="load-example">
             {t('planner.example', { name: EXAMPLE_ROUTE.name })}
           </Button>
@@ -325,16 +355,17 @@ export function PlannerPanel() {
                 {scored.map(({ c, analysis, score, gain }, i) => (
                   <Card key={c.id} variant="outlined" sx={{ borderColor: c.id === s.selectedCandidateId ? 'primary.main' : 'divider' }}>
                     <CardActionArea onClick={() => selectCandidate(c)} sx={{ p: 1.25 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                        <Typography variant="subtitle2">{t('planner.variant', { n: i + 1 })}</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                          {fmtKm(c.distance)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          ~{fmtDuration(c.duration)}
-                          {gain !== null && ` · ↑ ${Math.round(gain)} m`}
-                        </Typography>
-                        <Box sx={{ flex: 1 }} />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="subtitle2" noWrap>
+                            {t('planner.variant', { n: i + 1 })} · <b>{fmtKm(c.distance)}</b>
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" noWrap component="div">
+                            ~{fmtDuration(c.duration)}
+                            {gain !== null && ` · ↑ ${Math.round(gain)} m`}
+                            {c.targetDistance ? ` · ${t('planner.loopTarget', { km: fmtKm(c.targetDistance) })}` : ''}
+                          </Typography>
+                        </Box>
                         {score && <Chip size="small" label={t('planner.score', { v: Math.round(score.score) })} color={i === 0 ? 'primary' : 'default'} />}
                       </Box>
                       {analysis && (
@@ -484,10 +515,14 @@ export function PlannerPanel() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="body2" noWrap data-testid="planner-status" sx={{ fontWeight: selected ? 700 : 400 }}>
               {routeMut.isPending
-                ? t('planner.st.calculating')
+                ? s.roundTrip && s.waypoints.length === 1
+                  ? t('planner.st.loops')
+                  : t('planner.st.calculating')
                 : s.waypoints.length === 0
-                  ? t('planner.st.tapStart')
-                  : s.waypoints.length === 1
+                  ? s.roundTrip
+                    ? t('planner.st.tapLoop')
+                    : t('planner.st.tapStart')
+                  : s.waypoints.length === 1 && !s.roundTrip
                     ? t('planner.st.tapEnd')
                     : selected
                       ? `${fmtKm(selected.c.distance)} · ~${fmtDuration(selected.c.duration)}`
@@ -508,7 +543,7 @@ export function PlannerPanel() {
               <IconButton
                 aria-label={t('planner.recalc')}
                 data-testid="calculate-route"
-                disabled={!routingAvailable || routeMut.isPending || s.waypoints.length < 2}
+                disabled={!routingAvailable || routeMut.isPending || (s.waypoints.length < 2 && !(s.roundTrip && s.waypoints.length === 1))}
                 onClick={() => calculate()}
               >
                 <DirectionsBikeIcon />

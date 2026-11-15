@@ -1,4 +1,4 @@
-import type { RouteRequest, RouteResponse } from '@bce/shared';
+import type { LngLat, RouteCandidate, RouteRequest, RouteResponse } from '@bce/shared';
 
 export interface RoutingProvider {
   readonly id: string;
@@ -6,6 +6,8 @@ export interface RoutingProvider {
   readonly description: string;
   readonly attribution: string;
   route(req: RouteRequest): Promise<RouteResponse>;
+  /** One route through `points` with the engine's primary variant for these options (used by the loop planner). */
+  routeOnce?(points: LngLat[], req: Pick<RouteRequest, 'rideType' | 'preference'>): Promise<RouteCandidate>;
 }
 
 export type RoutingErrorCode = 'invalid' | 'no_route' | 'routing_not_configured' | 'routing_unavailable';

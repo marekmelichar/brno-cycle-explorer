@@ -201,6 +201,24 @@ export class BrouterProvider implements RoutingProvider {
     }
   }
 
+  async routeOnce(points: LngLat[], req: Pick<RouteRequest, 'rideType' | 'preference'>): Promise<RouteCandidate> {
+    const v = brouterVariants(req.preference, req.rideType)[0];
+    const t = await this.runVariant(points, v, 0);
+    return {
+      id: 'once',
+      variant: v.label,
+      variantCode: v.code,
+      alternative: 0,
+      coordinates: t.coords,
+      elevation: t.ele,
+      elevationInterval: null,
+      distance: t.distance,
+      duration: t.duration,
+      provider: this.id,
+      osm: t.osm,
+    };
+  }
+
   async route(req: RouteRequest): Promise<RouteResponse> {
     const pts = [...req.waypoints];
     if (req.roundTrip && pts.length >= 2) pts.push(pts[0]);
