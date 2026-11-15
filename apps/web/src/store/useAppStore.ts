@@ -61,6 +61,8 @@ interface State {
   infraOpacity: number;
   /** Opacity multiplier for ALL overlay lines (route, infrastructure, highlights): 0.15–1, set by the map slider. */
   overlayOpacity: number;
+  /** How the analysed route is drawn: coloured by matched infrastructure, or one plain colour. */
+  routeColorMode: 'smart' | 'simple';
   showInfra: boolean;
   selectedFeatureId: number | null;
   hoverFeatureId: number | null;
@@ -118,6 +120,7 @@ export const useAppStore = create<State>()(
       visibleCategories: defaultVisible,
       infraOpacity: 0.9,
       overlayOpacity: 1,
+      routeColorMode: 'smart',
       showInfra: true,
       selectedFeatureId: null,
       hoverFeatureId: null,
@@ -191,6 +194,7 @@ export const useAppStore = create<State>()(
         visibleCategories: s.visibleCategories,
         infraOpacity: s.infraOpacity,
         overlayOpacity: s.overlayOpacity,
+        routeColorMode: s.routeColorMode,
         matchOptions: s.matchOptions,
         rideType: s.rideType,
         preference: s.preference,

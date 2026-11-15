@@ -125,6 +125,7 @@ export function DataStatus() {
 
 export function InfrastructurePanel() {
   const { t, lang } = useI18n();
+  const routeColorMode = useAppStore((s) => s.routeColorMode);
   const visible = useAppStore((s) => s.visibleCategories);
   const toggle = useAppStore((s) => s.toggleCategory);
   const setAll = useAppStore((s) => s.setAllCategories);
@@ -184,7 +185,7 @@ export function InfrastructurePanel() {
           <line x1={1} y1={5} x2={27} y2={5} stroke="#f1f5f9" strokeWidth={4} strokeDasharray="5 4" />
         </svg>
         <Typography variant="caption" color="text.secondary">
-          {t('infra.routeNote', { unmatched: unmatchedLabel(lang) })}
+          {routeColorMode === 'simple' ? t('infra.routeNoteSimple') : t('infra.routeNote', { unmatched: unmatchedLabel(lang) })}
         </Typography>
       </Box>
       <Box>

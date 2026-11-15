@@ -13,6 +13,7 @@ import { sectionLabel } from '../../services/osm';
 import i18n, { currentLang, useI18n } from '../../i18n';
 import { nameWaypoint } from '../../services/waypointNames';
 import { SeeThroughButton } from './SeeThroughButton';
+import { RouteColorButton, SIMPLE_ROUTE_COLOR } from './RouteColorButton';
 
 type StyleStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; message?: string };
 
@@ -56,6 +57,7 @@ export function MapView() {
   const showInfra = useAppStore((s) => s.showInfra);
   const opacity = useAppStore((s) => s.infraOpacity);
   const overlayOpacity = useAppStore((s) => s.overlayOpacity);
+  const routeColorMode = useAppStore((s) => s.routeColorMode);
   const selectedFeatureId = useAppStore((s) => s.selectedFeatureId);
   const selectedSectionId = useAppStore((s) => s.selectedSectionId);
   const waypoints = useAppStore((s) => s.waypoints);
@@ -127,6 +129,12 @@ export function MapView() {
     map.setPaintProperty('bce-route-casing', 'line-opacity', 0.85 * k * k);
     map.setPaintProperty('bce-route-matched', 'line-opacity', k);
     map.setPaintProperty('bce-route-unmatched', 'line-opacity', k);
+    // Plain mode: the whole route in one solid colour (incl. unverified parts, no dashes).
+    const simple = s.routeColorMode === 'simple';
+    map.setPaintProperty('bce-route-matched', 'line-color', simple ? SIMPLE_ROUTE_COLOR : ['get', 'color']);
+    map.setPaintProperty('bce-route-unmatched', 'line-color', simple ? SIMPLE_ROUTE_COLOR : '#f1f5f9');
+    map.setPaintProperty('bce-route-unmatched', 'line-dasharray', simple ? [1, 0] : [1.2, 1]);
+    map.setPaintProperty('bce-route-unmatched', 'line-width', simple ? ['interpolate', ['linear'], ['zoom'], 11, 3.5, 15, 7] : ['interpolate', ['linear'], ['zoom'], 11, 3, 15, 6]);
     map.setPaintProperty('bce-candidates', 'line-opacity', 0.55 * k);
     map.setPaintProperty('bce-route-selected', 'line-opacity', 0.6 * k);
     map.setPaintProperty('bce-route-arrows', 'icon-opacity', Math.max(0.35, k));
@@ -235,7 +243,7 @@ export function MapView() {
     setSourceData(map, 'bce-route-start', overlay.routeStart);
   }, [overlay.route, overlay.candidates, overlay.manual, overlay.selectedSection, overlay.routeStart, mapReady]);
 
-  useEffect(applyLayerState, [visible, showInfra, opacity, overlayOpacity, selectedFeatureId, mapReady, applyLayerState]);
+  useEffect(applyLayerState, [visible, showInfra, opacity, overlayOpacity, routeColorMode, selectedFeatureId, mapReady, applyLayerState]);
 
   // ---------- waypoint markers (draggable) ----------
   useEffect(() => {
@@ -443,6 +451,7 @@ export function MapView() {
 
       <FeatureInspector />
       <SeeThroughButton />
+      <RouteColorButton />
     </Box>
   );
 }
