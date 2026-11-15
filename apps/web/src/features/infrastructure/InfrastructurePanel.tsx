@@ -23,7 +23,7 @@ import { useDatasetStats, useImportInfrastructure, useInfrastructure, useRefresh
 import { useAppStore } from '../../store/useAppStore';
 import { fmtDate, fmtDateTime, fmtInt, fmtKm } from '../../services/format';
 import { LineSwatch } from '../../components/LineSwatch';
-import { useNotify } from '../../components/Notifier';
+import { notifyPromise, useNotify } from '../../components/Notifier';
 
 export function DataStatus() {
   const { data, isLoading, error, refetch } = useInfrastructure();
@@ -90,10 +90,11 @@ export function DataStatus() {
           startIcon={refresh.isPending ? <CircularProgress size={14} /> : <RefreshIcon />}
           disabled={refresh.isPending}
           onClick={() =>
-            refresh.mutate(undefined, {
-              onSuccess: (d) => notify(`Data obnovena: ${d.meta.featureCount} prvků.`, 'success'),
-              onError: (e) => notify(`Obnovení selhalo: ${(e as Error).message}`, 'error'),
-            })
+            notifyPromise(refresh.mutateAsync(), {
+                  loading: 'Stahuji data z ArcGIS služby města…',
+                  success: (d) => `Data obnovena: ${d.meta.featureCount} prvků.`,
+                  error: (e) => `Obnovení selhalo: ${(e as Error).message}`,
+                }).catch(() => undefined)
           }
         >
           Obnovit data
