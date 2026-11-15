@@ -90,10 +90,23 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     await page.waitForTimeout(900);
     await page.screenshot({ path: 'tests/screenshots/desktop-gpx-analysis.png' });
 
+    // direction of travel: arrows along the route and a start dot
+    const dir = await page.evaluate(() => {
+      const m = (window as any).__bceMap;
+      return {
+        image: m.hasImage('bce-arrow'),
+        arrows: m.queryRenderedFeatures({ layers: ['bce-route-arrows'] }).length,
+        start: m.queryRenderedFeatures({ layers: ['bce-route-start'] }).length,
+      };
+    });
+    expect(dir.image).toBe(true);
+    expect(dir.arrows).toBeGreaterThan(3);
+    expect(dir.start).toBe(1);
+
     // street names stay readable: every overlay sits below the basemap's first label layer
     const order = await page.evaluate(() => {
       const layers = (window as any).__bceMap.getStyle().layers as Array<{ id: string; type: string }>;
-      const firstLabel = layers.findIndex((l) => l.type === 'symbol');
+      const firstLabel = layers.findIndex((l) => l.type === 'symbol' && !l.id.startsWith('bce-'));
       const lastOverlay = Math.max(...layers.map((l, i) => (l.id.startsWith('bce-') ? i : -1)));
       return { firstLabel, lastOverlay };
     });
