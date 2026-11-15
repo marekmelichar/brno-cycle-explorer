@@ -8,6 +8,6 @@ body { overscroll-behavior: none; }
 .maplibregl-ctrl-attrib { font-size: 11px; }
 .maplibregl-ctrl-group button { width: 32px; height: 32px; }
 @media (max-width: 899px) {
-  .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: 92px; }
+  .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: var(--bce-sheet-peek, 78px); }
 }
 :focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }

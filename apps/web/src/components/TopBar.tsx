@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { AppBar, Box, CircularProgress, IconButton, MenuItem, Select, Toolbar, Tooltip, Typography, useMediaQuery } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -6,6 +6,8 @@ import DownloadIcon from '@mui/icons-material/Download';
 import SettingsIcon from '@mui/icons-material/Settings';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import LayersIcon from '@mui/icons-material/Layers';
+import SearchIcon from '@mui/icons-material/Search';
+import CloseIcon from '@mui/icons-material/Close';
 import { useAppConfig, useRefreshInfrastructure } from '../hooks/data';
 import { useAppStore } from '../store/useAppStore';
 import { useExportGpx, useGpxImport } from '../hooks/useRouteActions';
@@ -22,6 +24,7 @@ export function TopBar() {
   const exportGpx = useExportGpx();
   const notify = useNotify();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const hasRoute = useAppStore((s) => !!s.activeRoute);
   const wide = useMediaQuery('(min-width:1100px)');
   const mobile = useMediaQuery('(max-width:899px)');
@@ -63,6 +66,14 @@ export function TopBar() {
               ))}
             </Select>
         )}
+        {mobile && (
+          <Tooltip title="Hledat místo">
+            <IconButton color="inherit" aria-label="Hledat místo" onClick={() => setSearchOpen(!searchOpen)} data-testid="mobile-search-button">
+              <SearchIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        {!mobile && (
         <Tooltip title="Obnovit data z ArcGIS služby města">
           <span>
             <IconButton
@@ -80,6 +91,7 @@ export function TopBar() {
             </IconButton>
           </span>
         </Tooltip>
+        )}
         <Tooltip title="Importovat GPX">
           <IconButton color="inherit" aria-label="Importovat GPX" onClick={() => fileRef.current?.click()}>
             <UploadFileIcon />
@@ -117,6 +129,23 @@ export function TopBar() {
           </Tooltip>
         )}
       </Toolbar>
+      {mobile && searchOpen && (
+        <Box sx={{ px: 1, pb: 1, display: 'flex', gap: 1, alignItems: 'center' }} data-testid="mobile-search">
+          <Box sx={{ flex: 1 }}>
+            <SearchBox
+              autoFocus
+              onSelect={(r) => {
+                if (r.bbox) fitTo(r.bbox);
+                else fitTo([r.lon - 0.004, r.lat - 0.003, r.lon + 0.004, r.lat + 0.003]);
+                setSearchOpen(false);
+              }}
+            />
+          </Box>
+          <IconButton color="inherit" aria-label="Zavřít hledání" onClick={() => setSearchOpen(false)}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      )}
     </AppBar>
   );
 }

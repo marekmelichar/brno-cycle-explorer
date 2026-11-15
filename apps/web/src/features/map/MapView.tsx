@@ -10,6 +10,7 @@ import { BRNO_CENTER } from '../../services/geometry';
 import { BLANK_STYLE, EMPTY_FC, INFRA_LAYER_IDS, ROUTE_LAYER_IDS, addOverlays, infraLayerId, setSourceData, type OverlayData } from './mapLayers';
 import { FeatureInspector } from './FeatureInspector';
 import { sectionLabel } from '../../services/osm';
+import { nameWaypoint } from '../../services/waypointNames';
 import { SeeThroughButton } from './SeeThroughButton';
 
 type StyleStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; message?: string };
@@ -251,7 +252,8 @@ export function MapView() {
       const marker = new maplibregl.Marker({ element: el, draggable: true }).setLngLat(w.position).addTo(map);
       marker.on('dragend', () => {
         const p = marker.getLngLat();
-        useAppStore.getState().moveWaypoint(w.id, [p.lng, p.lat]);
+        useAppStore.getState().moveWaypoint(w.id, [Number(p.lng.toFixed(6)), Number(p.lat.toFixed(6))]);
+        void nameWaypoint(w.id);
       });
       return marker;
     });
@@ -282,7 +284,11 @@ export function MapView() {
       const s = useAppStore.getState();
       if (s.tab === 'planner') {
         const p: [number, number] = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))];
-        if (s.plannerMode === 'auto') s.addWaypoint(p);
+        if (s.plannerMode === 'auto') {
+          s.addWaypoint(p);
+          const added = useAppStore.getState().waypoints.at(-1);
+          if (added) void nameWaypoint(added.id);
+        }
         else s.set({ manualLine: [...s.manualLine, p] });
         return;
       }
@@ -425,10 +431,10 @@ export function MapView() {
         </Box>
       )}
 
-      {tab === 'planner' && (
-        <Paper sx={{ position: 'absolute', top: 12, left: 12, px: 1.5, py: 0.75, zIndex: 2, maxWidth: 'calc(100% - 80px)' }} elevation={3}>
+      {tab === 'planner' && ((plannerMode === 'auto' && waypoints.length === 0) || (plannerMode === 'manual' && manualLine.length === 0)) && (
+        <Paper sx={{ position: 'absolute', top: 12, left: 12, px: 1.5, py: 0.75, zIndex: 2, maxWidth: 'calc(100% - 80px)' }} elevation={3} data-testid="planner-hint">
           <Typography variant="caption">
-            {plannerMode === 'auto' ? 'Klikněte do mapy pro přidání bodu trasy. Body lze přetahovat.' : 'Ruční kreslení: klikáním přidávejte vrcholy čáry.'}
+            {plannerMode === 'auto' ? 'Klepněte do mapy pro start trasy.' : 'Ruční kreslení: klepáním přidávejte vrcholy čáry.'}
           </Typography>
         </Paper>
       )}
