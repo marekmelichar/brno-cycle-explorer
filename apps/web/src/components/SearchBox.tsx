@@ -9,10 +9,11 @@ interface Props {
   placeholder?: string;
   size?: 'small' | 'medium';
   dense?: boolean;
+  autoFocus?: boolean;
 }
 
 /** Debounced (600 ms, ≥ 3 characters) geocoding – requests only while the user types. */
-export function SearchBox({ onSelect, placeholder = 'Hledat místo nebo adresu v Brně…', size = 'small' }: Props) {
+export function SearchBox({ onSelect, placeholder = 'Hledat místo nebo adresu v Brně…', size = 'small', autoFocus }: Props) {
   const [input, setInput] = useState('');
   const [options, setOptions] = useState<GeocodeResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,6 +69,7 @@ export function SearchBox({ onSelect, placeholder = 'Hledat místo nebo adresu v
         <TextField
           {...params}
           placeholder={placeholder}
+          autoFocus={autoFocus}
           inputProps={{ ...params.inputProps, 'aria-label': placeholder }}
           InputProps={{
             ...params.InputProps,

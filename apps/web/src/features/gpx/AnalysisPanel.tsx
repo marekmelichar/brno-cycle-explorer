@@ -12,6 +12,9 @@ import {
   TableRow,
   Tooltip,
   Typography,
+  List,
+  ListItemButton,
+  useMediaQuery,
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -101,12 +104,14 @@ export function AnalysisPanel() {
   const analysis = useActiveAnalysis();
   const rowRefs = useRef<Record<number, HTMLTableRowElement | null>>({});
   const sections = useMemo(() => analysis?.sections ?? [], [analysis]);
+  const mobile = useMediaQuery('(max-width:899px)');
 
   useEffect(() => {
     if (selectedId !== null) rowRefs.current[selectedId]?.scrollIntoView({ block: 'nearest' });
   }, [selectedId]);
 
   if (!active) return null;
+  if (mobile) return <MobileSectionList />;
   return (
     <Paper square elevation={8} data-testid="analysis-panel" sx={{ borderTop: '1px solid', borderColor: 'divider', bgcolor: 'background.paper', flexShrink: 0 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 2, py: 0.75, minHeight: 44 }}>
@@ -188,5 +193,55 @@ export function AnalysisPanel() {
         </Box>
       </Collapse>
     </Paper>
+  );
+}
+
+/** Phone layout: compact one-line rows instead of the table; the tapped section's detail opens inline. */
+function MobileSectionList() {
+  const active = useAppStore((s) => s.activeRoute);
+  const selectedId = useAppStore((s) => s.selectedSectionId);
+  const set = useAppStore((s) => s.set);
+  const fitTo = useAppStore((s) => s.fitTo);
+  const analysis = useActiveAnalysis();
+  if (!active || !analysis) return null;
+  return (
+    <Box data-testid="analysis-panel" sx={{ borderTop: '1px solid', borderColor: 'divider', pb: 2 }}>
+      <Typography variant="overline" color="text.secondary" sx={{ px: 2, display: 'block', pt: 1 }}>
+        Úseky trasy ({analysis.sections.length})
+      </Typography>
+      <List dense disablePadding data-testid="section-list">
+        {analysis.sections.map((s) => (
+          <Box key={s.id}>
+            <ListItemButton
+              selected={s.id === selectedId}
+              onClick={() => {
+                const again = s.id === selectedId;
+                set({ selectedSectionId: again ? null : s.id });
+                if (!again) {
+                  const b = linesBounds([s.coordinates]);
+                  if (b) fitTo(b);
+                }
+              }}
+              sx={{ px: 2, py: 0.5, gap: 1.25 }}
+            >
+              <Box sx={{ width: 10, height: 10, borderRadius: '2px', flexShrink: 0, bgcolor: s.category ? CATEGORIES[s.category].color : UNMATCHED_COLOR }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="body2" noWrap>
+                  {sectionLabel(active, analysis, s)}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" component="div">
+                  od {fmtKm(s.startDistance)}
+                  {s.confidence !== 'none' && ` · jistota ${s.confidence === 'high' ? 'vysoká' : 'střední'}`}
+                </Typography>
+              </Box>
+              <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                {fmtDistance(s.length)}
+              </Typography>
+            </ListItemButton>
+            {s.id === selectedId && <SectionDetail />}
+          </Box>
+        ))}
+      </List>
+    </Box>
   );
 }

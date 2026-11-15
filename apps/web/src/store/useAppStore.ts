@@ -19,6 +19,8 @@ export interface Waypoint {
   id: string;
   position: LngLat;
   name: string;
+  /** True while the name is automatic ("Bod N" or a looked-up street); false once the user typed one. */
+  autoName?: boolean;
 }
 
 /** The route currently analysed and shown on the map. `kind` tells its provenance. */
@@ -77,6 +79,8 @@ interface State {
   preference: RoutePreference;
   /** Routing engine chosen in the planner (null = server default). */
   engine: string | null;
+  /** Waypoints or route options changed since the last calculation: the planner recalculates automatically. */
+  routeDirty: boolean;
   candidates: RouteCandidate[];
   selectedCandidateId: string | null;
   savedRoutes: SavedRoute[];
@@ -127,6 +131,7 @@ export const useAppStore = create<State>()(
       rideType: 'ebike',
       preference: 'max_paths',
       engine: null,
+      routeDirty: false,
       candidates: [],
       selectedCandidateId: null,
       savedRoutes: [],
@@ -141,20 +146,21 @@ export const useAppStore = create<State>()(
         set({ visibleCategories: Object.fromEntries(CATEGORY_ORDER.map((c) => [c, c === 'not_infrastructure' ? false : v])) as Record<InfraCategory, boolean> }),
       addWaypoint: (p, name) =>
         set((s) => ({
-          waypoints: [...s.waypoints, { id: newWaypointId(), position: p, name: name ?? `Bod ${s.waypoints.length + 1}` }],
+          waypoints: [...s.waypoints, { id: newWaypointId(), position: p, name: name ?? `Bod ${s.waypoints.length + 1}`, autoName: name === undefined }],
           candidates: [],
           selectedCandidateId: null,
+          routeDirty: true,
         })),
       moveWaypoint: (id, p) =>
-        set((s) => ({ waypoints: s.waypoints.map((w) => (w.id === id ? { ...w, position: p } : w)), candidates: [], selectedCandidateId: null })),
-      removeWaypoint: (id) => set((s) => ({ waypoints: s.waypoints.filter((w) => w.id !== id), candidates: [], selectedCandidateId: null })),
+        set((s) => ({ waypoints: s.waypoints.map((w) => (w.id === id ? { ...w, position: p } : w)), candidates: [], selectedCandidateId: null, routeDirty: true })),
+      removeWaypoint: (id) => set((s) => ({ waypoints: s.waypoints.filter((w) => w.id !== id), candidates: [], selectedCandidateId: null, routeDirty: true })),
       reorderWaypoint: (from, to) =>
         set((s) => {
           if (to < 0 || to >= s.waypoints.length) return {};
           const w = [...s.waypoints];
           const [m] = w.splice(from, 1);
           w.splice(to, 0, m);
-          return { waypoints: w, candidates: [], selectedCandidateId: null };
+          return { waypoints: w, candidates: [], selectedCandidateId: null, routeDirty: true };
         }),
       clearPlanner: () =>
         set((s) => ({
@@ -162,6 +168,7 @@ export const useAppStore = create<State>()(
           manualLine: [],
           candidates: [],
           selectedCandidateId: null,
+          routeDirty: false,
           activeRoute: s.activeRoute && s.activeRoute.kind !== 'gpx' ? null : s.activeRoute,
           selectedSectionId: null,
         })),

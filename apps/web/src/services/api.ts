@@ -37,6 +37,8 @@ export const api = {
       body: JSON.stringify(req),
       timeoutMs: 120000,
     }),
+  reverseGeocode: (lat: number, lon: number) =>
+    request<{ label: string }>(`/api/geocode/reverse?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`, { timeoutMs: 20000 }),
   geocode: (q: string, signal?: AbortSignal) =>
     request<{ results: GeocodeResult[] }>(`/api/geocode?q=${encodeURIComponent(q)}`, { signal }),
 };

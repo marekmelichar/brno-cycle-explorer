@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   Alert,
@@ -34,7 +34,8 @@ import UndoIcon from '@mui/icons-material/Undo';
 import SaveIcon from '@mui/icons-material/Save';
 import DownloadIcon from '@mui/icons-material/Download';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
-import { EXAMPLE_ROUTE, type RideType, type RouteCandidate, type RoutePreference } from '@bce/shared';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import { EXAMPLE_ROUTE, type RideType, type RouteCandidate, type RoutePreference, type RouteResponse } from '@bce/shared';
 import { analyzeRoute, elevationStats, scoreRoute, type RouteAnalysis, type RouteScore } from '@bce/geo';
 import { api } from '../../services/api';
 import { useAppConfig, useInfraIndex } from '../../hooks/data';
@@ -97,43 +98,57 @@ export function PlannerPanel() {
     });
   };
 
-  const routeMut = useMutation({
-    mutationFn: api.route,
-    onSuccess: (res) => {
-      if (!res.candidates.length) {
-        notify('Směrovací server nevrátil žádnou trasu.', 'warning');
-        return;
-      }
-      useAppStore.getState().set({ candidates: res.candidates });
-      // pick best-scored candidate
-      const st = useAppStore.getState();
-      const minDist = Math.min(...res.candidates.map((c) => c.distance));
-      const best = [...res.candidates]
-        .map((c) => {
-          const a = index ? analyzeRoute([c.coordinates], index, st.matchOptions) : null;
-          const g = c.elevation ? elevationStats(c.elevation)?.gain ?? null : null;
-          return { c, sc: a ? scoreRoute(a, st.preference, { elevationGain: g, shortestDistance: minDist }).score : 0 };
-        })
-        .sort((a, b) => b.sc - a.sc)[0].c;
-      selectCandidate(best);
-      const b = linesBounds([best.coordinates]);
-      if (b) st.fitTo(b);
-      if (res.warnings.length) notify(res.warnings.join(' '), 'warning');
-    },
-    onError: (e) => notify((e as Error).message, 'error'),
-  });
+  const routeMut = useMutation({ mutationFn: api.route });
 
-  const calculate = (wps = s.waypoints) => {
-    if (wps.length < 2) {
-      notify('Zadejte alespoň start a cíl (kliknutím do mapy).', 'info');
+  const handleRouteResult = (res: RouteResponse, fit: boolean) => {
+    if (!res.candidates.length) {
+      notify('Směrovací server nevrátil žádnou trasu.', 'warning');
       return;
     }
-    routeMut.mutate({ waypoints: wps.map((w) => w.position), rideType: s.rideType, preference: s.preference, roundTrip: s.roundTrip, engine: engine ?? undefined });
+    useAppStore.getState().set({ candidates: res.candidates });
+    // pick best-scored candidate
+    const st = useAppStore.getState();
+    const minDist = Math.min(...res.candidates.map((c) => c.distance));
+    const best = [...res.candidates]
+      .map((c) => {
+        const a = index ? analyzeRoute([c.coordinates], index, st.matchOptions) : null;
+        const g = c.elevation ? elevationStats(c.elevation)?.gain ?? null : null;
+        return { c, sc: a ? scoreRoute(a, st.preference, { elevationGain: g, shortestDistance: minDist }).score : 0 };
+      })
+      .sort((a, b) => b.sc - a.sc)[0].c;
+    selectCandidate(best);
+    if (fit) {
+      const b = linesBounds([best.coordinates]);
+      if (b) st.fitTo(b);
+    }
+    if (res.warnings.length) notify(res.warnings.join(' '), 'warning');
   };
+
+  /** fit: zoom to the result (explicit calculations); automatic recalculations keep the view. */
+  const calculate = (wps = s.waypoints, fit = true) => {
+    if (wps.length < 2) {
+      notify('Zadejte alespoň start a cíl (klepnutím do mapy).', 'info');
+      return;
+    }
+    s.set({ routeDirty: false });
+    // TanStack Query runs per-call callbacks only for the latest mutate(): older responses are dropped.
+    routeMut.mutate(
+      { waypoints: wps.map((w) => w.position), rideType: s.rideType, preference: s.preference, roundTrip: s.roundTrip, engine: engine ?? undefined },
+      { onSuccess: (res) => handleRouteResult(res, fit), onError: (e) => notify((e as Error).message, 'error') },
+    );
+  };
+
+  // Automatic (re)calculation once there are two points, whenever points or options change.
+  useEffect(() => {
+    if (!s.routeDirty || s.plannerMode !== 'auto' || !routingAvailable || s.waypoints.length < 2) return;
+    const t = setTimeout(() => calculate(useAppStore.getState().waypoints, false), 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.routeDirty, s.waypoints, s.roundTrip, s.rideType, s.preference, engine, s.plannerMode, routingAvailable]);
 
   const loadExample = () => {
     const wps = EXAMPLE_ROUTE.waypoints.map((w) => ({ id: newWaypointId(), position: w.position, name: w.name }));
-    s.set({ plannerMode: 'auto', waypoints: wps, roundTrip: false, candidates: [], selectedCandidateId: null, manualLine: [] });
+    s.set({ plannerMode: 'auto', waypoints: wps, roundTrip: false, candidates: [], selectedCandidateId: null, manualLine: [], routeDirty: false });
     const b = linesBounds([wps.map((w) => w.position)]);
     if (b) s.fitTo(b);
     if (routingAvailable) calculate(wps);
@@ -192,15 +207,25 @@ export function PlannerPanel() {
             </Alert>
           )}
           {config && routingAvailable && (
-            <Typography variant="caption" color="text.secondary">
-              Trasy počítá {config.routing.description} po skutečné síti silnic a cest z OpenStreetMap. Výsledky se poté hodnotí podle přiřazené oficiální
-              infrastruktury.
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography variant="caption" color="text.secondary">
+                Trasa se přepočítá sama, jakmile máte start a cíl.
+              </Typography>
+              <Tooltip
+                enterTouchDelay={0}
+                leaveTouchDelay={6000}
+                title={`Trasy počítá ${config.routing.description} po skutečné síti silnic a cest z OpenStreetMap. Výsledky se poté hodnotí podle přiřazené oficiální infrastruktury.`}
+              >
+                <IconButton size="small" aria-label="Jak se trasy počítají">
+                  <InfoOutlinedIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            </Box>
           )}
           {engines.length > 1 && (
             <FormControl size="small" fullWidth>
               <InputLabel id="engine">Směrovač</InputLabel>
-              <Select labelId="engine" label="Směrovač" value={engine ?? ''} onChange={(e) => s.set({ engine: e.target.value, candidates: [] })} data-testid="engine-select">
+              <Select labelId="engine" label="Směrovač" value={engine ?? ''} onChange={(e) => s.set({ engine: e.target.value, candidates: [], routeDirty: true })} data-testid="engine-select">
                 {engines.map((e) => (
                   <MenuItem key={e.id} value={e.id}>
                     {e.label}
@@ -212,7 +237,7 @@ export function PlannerPanel() {
           <Stack direction="row" spacing={1}>
             <FormControl size="small" fullWidth>
               <InputLabel id="ride-type">Typ jízdy</InputLabel>
-              <Select labelId="ride-type" label="Typ jízdy" value={s.rideType} onChange={(e) => s.set({ rideType: e.target.value as RideType, candidates: [] })}>
+              <Select labelId="ride-type" label="Typ jízdy" value={s.rideType} onChange={(e) => s.set({ rideType: e.target.value as RideType, candidates: [], routeDirty: true })}>
                 {RIDE_TYPES.map((r) => (
                   <MenuItem key={r.id} value={r.id}>
                     {r.label}
@@ -222,7 +247,7 @@ export function PlannerPanel() {
             </FormControl>
             <FormControl size="small" fullWidth>
               <InputLabel id="pref">Preference trasy</InputLabel>
-              <Select labelId="pref" label="Preference trasy" value={s.preference} onChange={(e) => s.set({ preference: e.target.value as RoutePreference, candidates: [] })}>
+              <Select labelId="pref" label="Preference trasy" value={s.preference} onChange={(e) => s.set({ preference: e.target.value as RoutePreference, candidates: [], routeDirty: true })}>
                 {PREFS.map((r) => (
                   <MenuItem key={r.id} value={r.id}>
                     {r.label}
@@ -270,7 +295,7 @@ export function PlannerPanel() {
                     variant="standard"
                     size="small"
                     value={w.name}
-                    onChange={(e) => s.set({ waypoints: s.waypoints.map((x) => (x.id === w.id ? { ...x, name: e.target.value } : x)) })}
+                    onChange={(e) => s.set({ waypoints: s.waypoints.map((x) => (x.id === w.id ? { ...x, name: e.target.value, autoName: false } : x)) })}
                     inputProps={{ 'aria-label': `Název bodu ${i + 1}`, style: { fontSize: 13 } }}
                     fullWidth
                   />
@@ -279,28 +304,9 @@ export function PlannerPanel() {
             </List>
           </Box>
           <FormControlLabel
-            control={<Switch size="small" checked={s.roundTrip} onChange={(e) => s.set({ roundTrip: e.target.checked, candidates: [] })} />}
+            control={<Switch size="small" checked={s.roundTrip} onChange={(e) => s.set({ roundTrip: e.target.checked, candidates: [], routeDirty: true })} />}
             label={<Typography variant="body2">Okruh (návrat do startu)</Typography>}
           />
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant="contained"
-              startIcon={routeMut.isPending ? <CircularProgress size={16} color="inherit" /> : <DirectionsBikeIcon />}
-              disabled={!routingAvailable || routeMut.isPending || s.waypoints.length < 2}
-              onClick={() => calculate()}
-              data-testid="calculate-route"
-              sx={{ flex: 1 }}
-            >
-              {routeMut.isPending ? 'Počítám…' : 'Vypočítat trasu'}
-            </Button>
-            <Tooltip title="Smazat body i trasu">
-              <span>
-                <Button variant="outlined" onClick={s.clearPlanner} startIcon={<ClearAllIcon />} disabled={!s.waypoints.length && !s.candidates.length}>
-                  Vymazat
-                </Button>
-              </span>
-            </Tooltip>
-          </Stack>
           <Button variant="text" size="small" onClick={loadExample} data-testid="load-example">
             Ukázka: {EXAMPLE_ROUTE.name}
           </Button>
@@ -449,6 +455,77 @@ export function PlannerPanel() {
             ))}
           </List>
         </>
+      )}
+
+      {s.plannerMode === 'auto' && (
+        <Box
+          data-testid="planner-actions"
+          sx={{
+            position: 'sticky',
+            bottom: 0,
+            mx: -2,
+            mb: -2,
+            px: 2,
+            py: 1,
+            bgcolor: 'background.paper',
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" noWrap data-testid="planner-status" sx={{ fontWeight: selected ? 700 : 400 }}>
+              {routeMut.isPending
+                ? 'Počítám trasu…'
+                : s.waypoints.length === 0
+                  ? 'Klepněte do mapy: start'
+                  : s.waypoints.length === 1
+                    ? 'Klepněte do mapy: cíl'
+                    : selected
+                      ? `${fmtKm(selected.c.distance)} · ~${fmtDuration(selected.c.duration)}`
+                      : !routingAvailable
+                        ? 'Plánování není k dispozici'
+                        : 'Trasa není vypočtena'}
+            </Typography>
+            {selected?.analysis && !routeMut.isPending && (
+              <Typography variant="caption" color="text.secondary" noWrap component="div">
+                mimo vozovku{' '}
+                {fmtPct(selected.analysis.byGroup.filter((g) => g.key === 'dedicated' || g.key === 'shared').reduce((a, g) => a + g.share, 0))}
+                {scored.length > 1 && ` · ${scored.length} varianty níže`}
+              </Typography>
+            )}
+          </Box>
+          {routeMut.isPending && <CircularProgress size={20} />}
+          <Tooltip title="Přepočítat trasu">
+            <span>
+              <IconButton
+                aria-label="Přepočítat trasu"
+                data-testid="calculate-route"
+                disabled={!routingAvailable || routeMut.isPending || s.waypoints.length < 2}
+                onClick={() => calculate()}
+              >
+                <DirectionsBikeIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+          {s.activeRoute && s.activeRoute.kind !== 'gpx' && (
+            <Tooltip title="Export GPX">
+              <IconButton aria-label="Exportovat GPX" onClick={exportGpx}>
+                <DownloadIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Tooltip title="Smazat body i trasu">
+            <span>
+              <IconButton aria-label="Vymazat plán" onClick={s.clearPlanner} disabled={!s.waypoints.length && !s.candidates.length}>
+                <ClearAllIcon />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       )}
     </Stack>
   );

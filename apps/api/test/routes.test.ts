@@ -21,8 +21,10 @@ async function app(opts: { routing?: 'none' | 'valhalla'; valhallaFetch?: typeof
     silentLog,
   );
   const routing = opts.routing === 'valhalla' ? new ValhallaProvider('https://valhalla.test', 1000, opts.valhallaFetch) : new NoRoutingProvider();
-  const geocoder = new NominatimGeocoder('https://nominatim.test', 'test', async () =>
-    new Response(JSON.stringify([{ osm_type: 'way', osm_id: 1, display_name: 'Karlova, Brno', lat: '49.21', lon: '16.64', type: 'primary', boundingbox: ['49.2', '49.22', '16.63', '16.65'] }])),
+  const geocoder = new NominatimGeocoder('https://nominatim.test', 'test', async (url: string) =>
+    url.includes('/reverse?')
+      ? new Response(JSON.stringify({ display_name: 'Karlova, Maloměřice, Brno', address: { road: 'Karlova', suburb: 'Maloměřice', city: 'Brno' } }))
+      : new Response(JSON.stringify([{ osm_type: 'way', osm_id: 1, display_name: 'Karlova, Brno', lat: '49.21', lon: '16.64', type: 'primary', boundingbox: ['49.2', '49.22', '16.63', '16.65'] }])),
   );
   return { server: await buildApp({ config, infrastructure, routing, geocoder }, { logger: false }), infrastructure };
 }
@@ -89,6 +91,14 @@ describe('REST API', () => {
     expect((await server.inject('/api/geocode?q=ab')).statusCode).toBe(400);
     const r = await server.inject('/api/geocode?q=Karlova');
     expect(r.json().results[0]).toMatchObject({ label: 'Karlova, Brno', lat: 49.21, lon: 16.64 });
+  });
+
+  it('reverse geocode returns a short street name and validates coordinates', async () => {
+    const { server } = await app();
+    expect((await server.inject('/api/geocode/reverse?lat=abc&lon=16.6')).statusCode).toBe(400);
+    expect((await server.inject('/api/geocode/reverse?lat=95&lon=16.6')).statusCode).toBe(400);
+    const r = await server.inject('/api/geocode/reverse?lat=49.2104&lon=16.6428');
+    expect(r.json()).toEqual({ label: 'Karlova, Maloměřice' });
   });
 
   it('import endpoint rejects invalid payloads', async () => {
