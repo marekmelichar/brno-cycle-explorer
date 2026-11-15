@@ -179,7 +179,7 @@ export function InfrastructurePanel() {
           <line x1={1} y1={5} x2={27} y2={5} stroke="#f1f5f9" strokeWidth={4} strokeDasharray="5 4" />
         </svg>
         <Typography variant="caption" color="text.secondary">
-          Úseky naplánované nebo importované trasy mají barvu kategorie, po které vedou. Bílé čárkování = {UNMATCHED_LABEL}.
+          Úseky naplánované nebo importované trasy mají barvu kategorie, po které vedou. Bílé čárkování = {UNMATCHED_LABEL}. Šipky ukazují směr jízdy, zelená tečka start.
         </Typography>
       </Box>
       <Box>

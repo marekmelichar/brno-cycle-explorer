@@ -20,6 +20,37 @@ export interface OverlayData {
   candidates: GeoJSON.FeatureCollection;
   manual: GeoJSON.FeatureCollection;
   selectedSection: GeoJSON.FeatureCollection;
+  /** Start point of the active route (first coordinate). */
+  routeStart: GeoJSON.FeatureCollection;
+}
+
+const ARROW_IMAGE = 'bce-arrow';
+
+/** White chevron with a dark outline, pointing along +x (= line direction for symbol-placement line). */
+function createArrowImage(): { width: number; height: number; data: Uint8ClampedArray } {
+  const size = 40; // drawn at pixelRatio 2 → 20 css px
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d')!;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const chevron = () => {
+    ctx.beginPath();
+    ctx.moveTo(11, 7);
+    ctx.lineTo(28, 20);
+    ctx.lineTo(11, 33);
+  };
+  chevron();
+  ctx.strokeStyle = '#0b1220';
+  ctx.lineWidth = 12;
+  ctx.stroke();
+  chevron();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 6.5;
+  ctx.stroke();
+  const img = ctx.getImageData(0, 0, size, size);
+  return { width: size, height: size, data: img.data };
 }
 
 /** (Re)creates all application overlays. Called after every style load, so switching basemaps keeps overlays. */
@@ -33,6 +64,9 @@ export function addOverlays(map: MlMap, data: OverlayData) {
   src('bce-candidates', data.candidates);
   src('bce-manual', data.manual);
   src('bce-selected-section', data.selectedSection);
+  src('bce-route-start', data.routeStart);
+  // Images are part of the style: re-add after every basemap switch.
+  if (!map.hasImage(ARROW_IMAGE)) map.addImage(ARROW_IMAGE, createArrowImage(), { pixelRatio: 2 });
 
   // Insert every overlay BELOW the basemap's first label layer, so street names, road numbers and
   // place labels stay readable on top of the cycling lines.
@@ -143,6 +177,31 @@ export function addOverlays(map: MlMap, data: OverlayData) {
     paint: { 'line-color': '#22d3ee', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 9, 15, 15], 'line-opacity': 0.6 },
   });
 
+  // Direction of travel: chevrons along the route in coordinate order (calculated routes follow the
+  // waypoint order, GPX tracks their recording order), so loops show which way round they go.
+  const arrowLayout = {
+    'symbol-placement': 'line' as const,
+    'symbol-spacing': ['interpolate', ['linear'], ['zoom'], 11, 70, 16, 110] as ExpressionSpecification,
+    'icon-image': ARROW_IMAGE,
+    'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.75, 15, 1.05, 18, 1.3] as ExpressionSpecification,
+    'icon-rotation-alignment': 'map' as const,
+    'icon-allow-overlap': true,
+    'icon-ignore-placement': true,
+    'icon-padding': 0,
+  };
+  add({ id: 'bce-route-arrows', type: 'symbol', source: 'bce-route', layout: arrowLayout });
+  add({
+    id: 'bce-route-start',
+    type: 'circle',
+    source: 'bce-route-start',
+    paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 16, 8],
+      'circle-color': '#16a34a',
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 2.5,
+    },
+  });
+
   add({
     id: 'bce-manual-line',
     type: 'line',
@@ -150,6 +209,7 @@ export function addOverlays(map: MlMap, data: OverlayData) {
     filter: ['==', ['geometry-type'], 'LineString'],
     paint: { 'line-color': '#f97316', 'line-width': 3, 'line-dasharray': [2, 1] },
   });
+  add({ id: 'bce-manual-arrows', type: 'symbol', source: 'bce-manual', filter: ['==', ['geometry-type'], 'LineString'], layout: arrowLayout });
   add({
     id: 'bce-manual-points',
     type: 'circle',

@@ -99,6 +99,10 @@ export function MapView() {
         ],
       },
       selectedSection: sel ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: sel.coordinates } }] } : EMPTY_FC,
+      routeStart:
+        analysis && analysis.sections.length
+          ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: analysis.sections[0].coordinates[0] } }] }
+          : EMPTY_FC,
     };
   }, [analysis, activeRoute, infra, candidates, selectedCandidateId, manualLine, selectedSectionId]);
   const overlayRef = useRef(overlay);
@@ -122,6 +126,9 @@ export function MapView() {
     map.setPaintProperty('bce-route-unmatched', 'line-opacity', k);
     map.setPaintProperty('bce-candidates', 'line-opacity', 0.55 * k);
     map.setPaintProperty('bce-route-selected', 'line-opacity', 0.6 * k);
+    map.setPaintProperty('bce-route-arrows', 'icon-opacity', Math.max(0.35, k));
+    map.setPaintProperty('bce-route-start', 'circle-opacity', Math.max(0.5, k));
+    map.setPaintProperty('bce-route-start', 'circle-stroke-opacity', Math.max(0.5, k));
     map.setPaintProperty('bce-infra-selected', 'line-opacity', 0.75 * k);
     const visibleCats = CATEGORY_ORDER.filter((c) => s.showInfra && s.visibleCategories[c] && c !== 'not_infrastructure');
     map.setFilter('bce-infra-casing', ['in', ['get', 'category'], ['literal', visibleCats]]);
@@ -222,7 +229,8 @@ export function MapView() {
     setSourceData(map, 'bce-candidates', overlay.candidates);
     setSourceData(map, 'bce-manual', overlay.manual);
     setSourceData(map, 'bce-selected-section', overlay.selectedSection);
-  }, [overlay.route, overlay.candidates, overlay.manual, overlay.selectedSection, mapReady]);
+    setSourceData(map, 'bce-route-start', overlay.routeStart);
+  }, [overlay.route, overlay.candidates, overlay.manual, overlay.selectedSection, overlay.routeStart, mapReady]);
 
   useEffect(applyLayerState, [visible, showInfra, opacity, overlayOpacity, selectedFeatureId, mapReady, applyLayerState]);
 
