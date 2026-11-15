@@ -341,6 +341,7 @@ export const cs = {
     opacity: "Průhlednost vrstev: {{v}} %",
     lengthsNote: "Délky u kategorií jsou součtem geometrií záznamů (bez deduplikace). Klikněte na linii v mapě pro zobrazení původních atributů. Piktogramové koridory a cyklopruhy nejsou fyzicky oddělenou infrastrukturou.",
     sourcesLink: "Zdroje dat a převodní tabulka kategorií",
+    routeNoteSimple: "Trasa je zobrazená jednou barvou; barvy podle infrastruktury zapnete tlačítkem s paletou na mapě.",
   },
   sources: {
     title: "Zdroje dat a spolehlivost",
@@ -474,6 +475,10 @@ export const cs = {
     desc: "{{list}}",
     descBrouter: "BRouter – cyklistické profily nad OSM",
     descValhalla: "Valhalla – cyklistický profil (bicycle)",
+  },
+  routeColor: {
+    toSimple: "Trasa jednou barvou",
+    toSmart: "Trasa barevně podle infrastruktury",
   },
 };
 

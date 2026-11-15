@@ -343,6 +343,7 @@ export const en: Messages = {
     opacity: "Layer opacity: {{v}}%",
     lengthsNote: "Category lengths are sums of record geometries (not deduplicated). Click a line on the map to see its original attributes. Pictogram corridors and cycle lanes are not physically separated infrastructure.",
     sourcesLink: "Data sources and category mapping",
+    routeNoteSimple: "The route is shown in one colour; switch on colours by infrastructure with the palette button on the map.",
   },
   sources: {
     title: "Data sources and reliability",
@@ -476,5 +477,9 @@ export const en: Messages = {
     desc: "{{list}}",
     descBrouter: "BRouter (cycling profiles on OSM)",
     descValhalla: "Valhalla (bicycle profile)",
+  },
+  routeColor: {
+    toSimple: "Route in one colour",
+    toSmart: "Route coloured by infrastructure",
   },
 };

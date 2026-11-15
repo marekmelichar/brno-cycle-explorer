@@ -57,6 +57,8 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     await expect(page.getByTestId('feature-inspector')).toContainText('datum_exportu');
     await page.getByLabel('Zavřít detail').click();
 
+    await expect(page.getByTestId('route-color-button')).toHaveCount(0); // only with a route
+
     // 8: toggle a category off and on
     const before = await page.evaluate(() => (window as any).__bceMap.queryRenderedFeatures({ layers: ['bce-infra-shared_path'] }).length);
     expect(before).toBeGreaterThan(0);
@@ -130,6 +132,18 @@ test.describe('Brno Cycle Explorer – desktop', () => {
     await expect.poll(routeOpacity).toBe(1);
     await page.getByTestId('see-through-button').click();
     await expect(page.getByTestId('opacity-panel')).toBeHidden();
+
+    // plain route colour ⇄ smart colours by infrastructure
+    const paint = (layer: string, prop: string) => page.evaluate(([l, p]) => (window as any).__bceMap.getPaintProperty(l, p), [layer, prop]);
+    await page.getByTestId('route-color-button').click();
+    await expect.poll(() => paint('bce-route-matched', 'line-color')).toBe('#e600a8');
+    expect(await paint('bce-route-unmatched', 'line-color')).toBe('#e600a8');
+    expect(await paint('bce-route-unmatched', 'line-dasharray')).toEqual([1, 0]);
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: 'tests/screenshots/desktop-route-simple.png' });
+    await page.getByTestId('route-color-button').click();
+    await expect.poll(() => paint('bce-route-matched', 'line-color')).toEqual(['get', 'color']);
+    expect(await paint('bce-route-unmatched', 'line-dasharray')).toEqual([1.2, 1]);
 
     // 11: export GPX and validate XML
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-gpx').click()]);
