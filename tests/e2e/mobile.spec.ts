@@ -86,3 +86,28 @@ test('mobile planner: two taps on the map calculate the route automatically', as
   await expect(page.getByTestId('peek-summary')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('mobile: a dropped connection while routing shows a retry, and recovers', async ({ page }) => {
+  await page.goto('/');
+  await waitForMapReady(page);
+  const cfg = await page.evaluate(() => fetch('/api/config').then((r) => r.json()));
+  test.skip(!cfg.routing.available, 'routing not configured');
+  // the first route request dies mid-flight (as when iOS suspends the browser)
+  let failed = false;
+  await page.route('**/api/route', async (route) => {
+    if (!failed) {
+      failed = true;
+      await route.abort('connectionreset');
+    } else await route.continue();
+  });
+  await page.getByTestId('tab-planner').click();
+  const box = (await page.getByTestId('map-container').boundingBox())!;
+  const a = await page.evaluate(() => (window as any).__bceMap.project([16.6, 49.195]));
+  const b = await page.evaluate(() => (window as any).__bceMap.project([16.612, 49.2]));
+  await page.mouse.click(box.x + a.x, box.y + a.y);
+  await page.mouse.click(box.x + b.x, box.y + b.y);
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: 'Spojení se přerušilo' });
+  await expect(toast).toBeVisible({ timeout: 30_000 });
+  await toast.getByRole('button', { name: 'Zkusit znovu' }).click();
+  await expect(page.getByTestId('planner-status')).toContainText(/\d+,\d km/, { timeout: 90_000 });
+});

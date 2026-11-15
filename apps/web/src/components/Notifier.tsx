@@ -3,10 +3,10 @@ import { Toaster, toast } from 'sonner';
 import { useMediaQuery } from '@mui/material';
 
 export type NotifySeverity = 'success' | 'error' | 'warning' | 'info';
-type Notify = (msg: string, severity?: NotifySeverity) => void;
+type Notify = (msg: string, severity?: NotifySeverity, action?: { label: string; onClick: () => void }) => void;
 
-const notify: Notify = (msg, severity = 'info') => {
-  const opts = { duration: severity === 'error' ? 8000 : severity === 'warning' ? 6000 : 3500 };
+const notify: Notify = (msg, severity = 'info', action) => {
+  const opts = { duration: severity === 'error' ? 8000 : severity === 'warning' ? 6000 : 3500, ...(action ? { action } : {}) };
   if (severity === 'success') toast.success(msg, opts);
   else if (severity === 'error') toast.error(msg, opts);
   else if (severity === 'warning') toast.warning(msg, opts);

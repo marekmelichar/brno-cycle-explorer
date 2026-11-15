@@ -449,6 +449,8 @@ export const en: Messages = {
     loopHintOne: "With a single point (the start) I propose loops of this length in four directions.",
     loopHintMany: "The loop length applies when only the start point is left.",
     loopTarget: "target {{km}}",
+    retry: "Try again",
+    interrupted: "The connection was interrupted (e.g. when switching apps). The route will be recalculated when you come back.",
   },
   wp: {
     start: "S",
