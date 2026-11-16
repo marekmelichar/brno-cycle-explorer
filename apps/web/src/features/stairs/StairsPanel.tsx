@@ -213,6 +213,7 @@ export function StairsPanel() {
       {view.data?.meta.lastError && view.mode === 'tiles' && !view.pending && (
         <Typography variant="caption" color="text.secondary">
           {t('stairs.error', { msg: view.data.meta.lastError.message })}
+          {view.data.meta.nextRetryAt && ` ${t('stairs.nextRetry', { time: new Date(view.data.meta.nextRetryAt).toLocaleTimeString(lang === 'en' ? 'en-GB' : 'cs-CZ', { hour: '2-digit', minute: '2-digit' }) })}`}
         </Typography>
       )}
     </Stack>

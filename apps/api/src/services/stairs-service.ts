@@ -5,7 +5,7 @@ import { FileCache } from '../cache/file-cache';
 import type { Logger } from './infrastructure-service';
 
 interface CachedStairs {
-  meta: Omit<StairsMeta, 'refreshing' | 'lastError'>;
+  meta: Omit<StairsMeta, 'refreshing' | 'lastError' | 'nextRetryAt'>;
   stairs: Stair[];
 }
 
@@ -18,12 +18,20 @@ export class StairsService {
   private current: CachedStairs | null = null;
   private refreshPromise: Promise<CachedStairs> | null = null;
   private lastError: StairsMeta['lastError'] = null;
+  private retryTimer: NodeJS.Timeout | null = null;
+  private retryAt: number | null = null;
+  private failures = 0;
 
+  /**
+   * @param retryDelaysMs Backoff for retries while there is NO data yet (public Overpass instances
+   *   are often briefly overloaded). The last delay repeats. With data, the regular refresh applies.
+   */
   constructor(
     private readonly client: OverpassClient,
     private readonly cache: FileCache<CachedStairs>,
     private readonly bbox: [number, number, number, number],
     private readonly log: Logger,
+    private readonly retryDelaysMs: number[] = [5, 10, 20, 40, 60].map((m) => m * 60_000),
   ) {}
 
   get available() {
@@ -48,9 +56,36 @@ export class StairsService {
     if (ageDays > olderThanDays) this.refresh().catch(() => undefined); // errors are recorded in lastError
   }
 
+  /** Retry with backoff while there is no data; a later success or manual refresh supersedes it. */
+  private scheduleRetry() {
+    if (this.retryTimer || !this.retryDelaysMs.length) return;
+    const delay = this.retryDelaysMs[Math.min(this.failures, this.retryDelaysMs.length - 1)];
+    this.failures++;
+    this.retryAt = Date.now() + delay;
+    this.log.info({ inMinutes: Math.round(delay / 60000), attempt: this.failures }, 'Stairs: retry scheduled');
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.retryAt = null;
+      this.refresh().catch(() => undefined);
+    }, delay);
+    this.retryTimer.unref?.();
+  }
+
+  /** Stops a pending retry (tests, shutdown). */
+  dispose() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    this.retryAt = null;
+  }
+
   getMeta(): StairsMeta {
     const base = this.current?.meta ?? { source: 'none' as const, sourceUrl: null, count: 0, lastRefreshed: null, osmTimestamp: null };
-    return { ...base, lastError: this.lastError, refreshing: this.refreshPromise !== null };
+    return {
+      ...base,
+      lastError: this.lastError,
+      refreshing: this.refreshPromise !== null,
+      nextRetryAt: this.retryAt ? new Date(this.retryAt).toISOString() : null,
+    };
   }
 
   get(): StairsResponse {
@@ -77,6 +112,7 @@ export class StairsService {
         };
         this.current = data;
         this.lastError = null;
+        this.failures = 0;
         await this.cache.write(data).catch((e) => this.log.warn({ err: String(e) }, 'Could not write stairs cache'));
         this.log.info({ stairs: stairs.length, ways: res.elements.length, ms: Date.now() - started }, 'Stairs refreshed');
         return data;
@@ -84,6 +120,7 @@ export class StairsService {
         const message = err instanceof Error ? err.message : String(err);
         this.lastError = { message, at: new Date().toISOString() };
         this.log.error({ err: message }, 'Stairs refresh failed');
+        if (!this.current) this.scheduleRetry();
         throw err;
       } finally {
         this.refreshPromise = null;

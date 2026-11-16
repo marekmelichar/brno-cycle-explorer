@@ -15,7 +15,8 @@ export interface OverpassResult {
 export class OverpassClient {
   constructor(
     private readonly urls: string[],
-    private readonly opts: { timeoutMs: number; userAgent: string; log?: Logger; fetch?: typeof fetch },
+    /** busyRetryDelayMs: one retry of the same endpoint after a "busy" answer (429/502/503/504). */
+    private readonly opts: { timeoutMs: number; userAgent: string; log?: Logger; fetch?: typeof fetch; busyRetryDelayMs?: number },
   ) {}
 
   get available() {
@@ -25,14 +26,22 @@ export class OverpassClient {
   async query(ql: string): Promise<OverpassResult> {
     const f = this.opts.fetch ?? fetch;
     const errors: string[] = [];
+    const post = (url: string) =>
+      f(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': this.opts.userAgent, Accept: 'application/json' },
+        body: new URLSearchParams({ data: ql }).toString(),
+        signal: AbortSignal.timeout(this.opts.timeoutMs),
+      });
     for (const url of this.urls) {
       try {
-        const res = await f(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': this.opts.userAgent, Accept: 'application/json' },
-          body: new URLSearchParams({ data: ql }).toString(),
-          signal: AbortSignal.timeout(this.opts.timeoutMs),
-        });
+        let res = await post(url);
+        // public instances answer 429/502/503/504 when overloaded: wait a moment and try once more
+        if ([429, 502, 503, 504].includes(res.status)) {
+          this.opts.log?.warn({ url, status: res.status }, 'Overpass busy, retrying once');
+          await new Promise((r) => setTimeout(r, this.opts.busyRetryDelayMs ?? 10_000));
+          res = await post(url);
+        }
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as { elements?: unknown[]; osm3s?: { timestamp_osm_base?: string }; remark?: string };
         if (!Array.isArray(json.elements)) throw new Error('neplatná odpověď');
