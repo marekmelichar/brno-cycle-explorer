@@ -86,7 +86,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     geocoderUrl: (env.GEOCODER_URL ?? 'https://nominatim.openstreetmap.org').replace(/\/$/, ''),
     geocoderUserAgent: env.GEOCODER_USER_AGENT ?? 'BrnoCycleExplorer/1.0 (self-hosted open-source app)',
     geocoderEnabled: env.GEOCODER_ENABLED !== 'false',
-    overpassUrls: (env.OVERPASS_URLS ?? 'https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter')
+    overpassUrls: (env.OVERPASS_URLS ?? 'https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter,https://overpass.private.coffee/api/interpreter')
       .split(',')
       .map((u) => u.trim().replace(/\/$/, ''))
       .filter(Boolean),

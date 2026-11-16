@@ -218,6 +218,8 @@ export interface StairsMeta {
   osmTimestamp: string | null;
   lastError: { message: string; at: string } | null;
   refreshing: boolean;
+  /** When the next automatic attempt runs after a failed first download (null when not scheduled). */
+  nextRetryAt: string | null;
 }
 
 export interface StairsResponse {

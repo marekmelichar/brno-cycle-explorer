@@ -529,6 +529,7 @@ export const cs = {
     destNameSteps_other: "Schody ({{count}} schodů)",
     hover: "Schody · {{info}}",
     error: "Schody se nepodařilo načíst: {{msg}}",
+    nextRetry: "Další pokus v {{time}}.",
   },
   wp: {
     start: "S",

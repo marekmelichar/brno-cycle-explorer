@@ -160,7 +160,7 @@ All settings are environment variables. See [.env.example](.env.example). Main o
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter` | Overpass endpoints for the stairs finder, tried in order (empty = off) |
+| `OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.kumi.systems/api/interpreter,https://overpass.private.coffee/api/interpreter` | Overpass endpoints for the stairs finder, tried in order (empty = off) |
 | `STAIRS_BBOX` | `16.45,49.12,16.75,49.3` | Area searched for stairs: minLon,minLat,maxLon,maxLat |
 | `STAIRS_REFRESH_DAYS` | `7` | Stairs data refresh interval |
 | `ARCGIS_LAYER_URL` | Brno FeatureServer layer 0 | Official data source |

@@ -531,6 +531,7 @@ export const en: Messages = {
     destNameSteps_other: "Stairs ({{count}} steps)",
     hover: "Stairs · {{info}}",
     error: "Could not load stairs: {{msg}}",
+    nextRetry: "Next attempt at {{time}}.",
   },
   wp: {
     start: "S",

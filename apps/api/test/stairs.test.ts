@@ -31,10 +31,11 @@ function fakeFetch(behaviour: Record<string, 'ok' | 'fail' | 'remark' | 'empty'>
   return { fn, calls };
 }
 
-async function service(urls: string[], f: typeof fetch) {
+async function service(urls: string[], f: typeof fetch, retryDelaysMs: number[] = []) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'bce-stairs-'));
   const cache = new FileCache<never>(dir, 'stairs');
-  return { svc: new StairsService(new OverpassClient(urls, { timeoutMs: 1000, userAgent: 'test', fetch: f }), cache, BBOX, silentLog), dir };
+  const client = new OverpassClient(urls, { timeoutMs: 1000, userAgent: 'test', fetch: f, busyRetryDelayMs: 1 });
+  return { svc: new StairsService(client, cache, BBOX, silentLog, retryDelaysMs), dir };
 }
 
 describe('Overpass stairs', () => {
@@ -46,7 +47,8 @@ describe('Overpass stairs', () => {
     const f = fakeFetch({ 'https://a.test/api': 'fail', 'https://b.test/api': 'remark', 'https://c.test/api': 'ok' });
     const { svc } = await service(['https://a.test/api', 'https://b.test/api', 'https://c.test/api'], f.fn);
     await svc.refresh();
-    expect(f.calls).toEqual(['https://a.test/api', 'https://b.test/api', 'https://c.test/api']);
+    // a.test answered "busy" (429): retried once before moving on
+    expect(f.calls).toEqual(['https://a.test/api', 'https://a.test/api', 'https://b.test/api', 'https://c.test/api']);
     const r = svc.get();
     expect(r.meta).toMatchObject({ source: 'overpass', sourceUrl: 'https://c.test/api', count: 2, osmTimestamp: '2026-11-16T10:00:00Z', lastError: null });
     expect(r.stairs[0]).toMatchObject({ id: 'osm:1', stepCount: 30 });
@@ -81,5 +83,44 @@ describe('Overpass stairs', () => {
     expect(off.available).toBe(false);
     await off.init(7);
     expect(off.get().meta).toMatchObject({ source: 'none', count: 0, refreshing: false });
+  });
+
+  it('retries the same endpoint once when it is busy (502), then succeeds', async () => {
+    let n = 0;
+    const f = (async () => (++n === 1 ? new Response('', { status: 502 }) : new Response(JSON.stringify(ANSWER)))) as unknown as typeof fetch;
+    const { svc } = await service(['https://a.test/api'], f);
+    await svc.refresh();
+    expect(n).toBe(2);
+    expect(svc.get().stairs).toHaveLength(2);
+  });
+
+  it('without data, a failed download is retried automatically with backoff', async () => {
+    let n = 0;
+    // fails twice (each with its busy retry), then works
+    const f = (async () => (++n <= 4 ? new Response('', { status: 504 }) : new Response(JSON.stringify(ANSWER)))) as unknown as typeof fetch;
+    const { svc } = await service(['https://a.test/api'], f, [20, 40]);
+    await expect(svc.refresh()).rejects.toThrow(/HTTP 504/);
+    expect(svc.get().meta.nextRetryAt).not.toBeNull();
+    await new Promise((r) => setTimeout(r, 150));
+    expect(svc.get().stairs).toHaveLength(2);
+    expect(svc.get().meta).toMatchObject({ source: 'overpass', lastError: null, nextRetryAt: null });
+    svc.dispose();
+  });
+
+  it('with data, a failed refresh does not schedule fast retries', async () => {
+    let ok = true;
+    const f = (async () => (ok ? new Response(JSON.stringify(ANSWER)) : new Response('', { status: 504 }))) as unknown as typeof fetch;
+    const { svc } = await service(['https://a.test/api'], f, [10]);
+    await svc.refresh();
+    ok = false;
+    await expect(svc.refresh()).rejects.toThrow();
+    expect(svc.get().meta.nextRetryAt).toBeNull();
+  });
+
+  it('reports why a server refused (text from its error page)', async () => {
+    const f = (async () =>
+      new Response('<html><head><title>502</title><style>p{}</style></head><body><p>Error: runtime error: rate_limited, try again later</p></body></html>', { status: 503 })) as unknown as typeof fetch;
+    const { svc } = await service(['https://a.test/api'], f);
+    await expect(svc.refresh()).rejects.toThrow('a.test: HTTP 503 (502 Error: runtime error: rate_limited, try again later)');
   });
 });
