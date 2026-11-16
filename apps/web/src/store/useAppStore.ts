@@ -9,10 +9,20 @@ import {
   type RoutePreference,
   type RouteCandidate,
   type OsmInterval,
+  type Stair,
 } from '@bce/shared';
 import { DEFAULT_MATCH_OPTIONS, type GpxWarning, type MatchOptions, type TrackPoint } from '@bce/geo';
 
-export type SidebarTab = 'map' | 'planner' | 'gpx' | 'stats';
+export type SidebarTab = 'map' | 'planner' | 'gpx' | 'stats' | 'stairs';
+
+export interface StairFilters {
+  minSteps: number;
+  /** Hide indoor, underground, covered and private stairs. */
+  outdoorOnly: boolean;
+  /** Hide stairs tagged bicycle=no. */
+  hideNoBicycle: boolean;
+}
+export const DEFAULT_STAIR_FILTERS: StairFilters = { minSteps: 0, outdoorOnly: true, hideNoBicycle: false };
 export type PlannerMode = 'auto' | 'manual';
 
 export interface Waypoint {
@@ -91,8 +101,18 @@ interface State {
   selectedCandidateId: string | null;
   savedRoutes: SavedRoute[];
 
+  stairFilters: StairFilters;
+  stairSort: 'size' | 'distance';
+  /** Reference point for "nearest" sorting (device location or map centre). */
+  stairOrigin: { position: LngLat; fromLocation: boolean } | null;
+  selectedStairId: string | null;
+  /** Fallback stairs collected from the map tiles while Overpass data is unavailable. */
+  tileStairs: Stair[];
+
   fitRequest: { bounds: [number, number, number, number]; at: number } | null;
   settingsOpen: boolean;
+  /** Phone bottom sheet height. */
+  sheet: 'peek' | 'half' | 'full';
   sourcesOpen: boolean;
 
   set: (p: Partial<State>) => void;
@@ -145,8 +165,14 @@ export const useAppStore = create<State>()(
       candidates: [],
       selectedCandidateId: null,
       savedRoutes: [],
+      stairFilters: DEFAULT_STAIR_FILTERS,
+      stairSort: 'size',
+      stairOrigin: null,
+      selectedStairId: null,
+      tileStairs: [],
       fitRequest: null,
       settingsOpen: false,
+      sheet: 'peek',
       sourcesOpen: false,
 
       set: (p) => set(p),
@@ -214,6 +240,7 @@ export const useAppStore = create<State>()(
         engine: s.engine,
         targetKm: s.targetKm,
         savedRoutes: s.savedRoutes,
+        stairFilters: s.stairFilters,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
@@ -222,6 +249,7 @@ export const useAppStore = create<State>()(
           ...p,
           visibleCategories: { ...current.visibleCategories, ...(p.visibleCategories ?? {}) },
           matchOptions: { ...current.matchOptions, ...(p.matchOptions ?? {}) },
+          stairFilters: { ...current.stairFilters, ...(p.stairFilters ?? {}) },
         };
       },
     },

@@ -4,16 +4,19 @@ import type { ApiConfig } from './config';
 import type { InfrastructureService } from './services/infrastructure-service';
 import type { RoutingProvider } from './adapters/routing/types';
 import type { NominatimGeocoder } from './adapters/geocoding/nominatim';
+import type { StairsService } from './services/stairs-service';
 import { registerHealthRoutes } from './routes/health';
 import { registerInfrastructureRoutes } from './routes/infrastructure';
 import { registerRoutingRoutes } from './routes/routing';
 import { registerGeocodeRoutes } from './routes/geocode';
+import { registerStairsRoutes } from './routes/stairs';
 
 export interface AppDeps {
   config: ApiConfig;
   infrastructure: InfrastructureService;
   routing: RoutingProvider;
   geocoder: NominatimGeocoder | null;
+  stairs: StairsService;
 }
 
 export async function buildApp(deps: AppDeps, opts: { logger?: boolean | object } = {}): Promise<FastifyInstance> {
@@ -32,5 +35,6 @@ export async function buildApp(deps: AppDeps, opts: { logger?: boolean | object 
   registerInfrastructureRoutes(app, deps);
   registerRoutingRoutes(app, deps);
   registerGeocodeRoutes(app, deps);
+  registerStairsRoutes(app, deps);
   return app;
 }

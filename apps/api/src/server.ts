@@ -8,6 +8,8 @@ import { ValhallaProvider } from './adapters/routing/valhalla';
 import { BrouterProvider } from './adapters/routing/brouter';
 import { MultiRoutingProvider } from './adapters/routing/multi';
 import { NominatimGeocoder } from './adapters/geocoding/nominatim';
+import { OverpassClient } from './adapters/osm/overpass-client';
+import { StairsService } from './services/stairs-service';
 import pino from 'pino';
 
 const config = loadConfig();
@@ -26,8 +28,16 @@ const engines = config.routingEngines.map((e) =>
 const routing: RoutingProvider = engines.length ? new MultiRoutingProvider(engines) : new NoRoutingProvider();
 const geocoder = config.geocoderEnabled ? new NominatimGeocoder(config.geocoderUrl, config.geocoderUserAgent) : null;
 
-const app = await buildApp({ config, infrastructure, routing, geocoder });
+const overpass = new OverpassClient(config.overpassUrls, { timeoutMs: config.overpassTimeoutMs, userAgent: config.geocoderUserAgent, log });
+const stairs = new StairsService(overpass, new FileCache(config.cacheDir, 'stairs'), config.stairsBbox, log);
+
+const app = await buildApp({ config, infrastructure, routing, geocoder, stairs });
 await infrastructure.init(config.refreshOnStartIfOlderThanHours);
+await stairs.init(config.stairsRefreshDays);
+if (stairs.available) {
+  // check daily; the service refreshes only data older than STAIRS_REFRESH_DAYS
+  setInterval(() => stairs.refreshIfStale(config.stairsRefreshDays), 24 * 3.6e6).unref();
+}
 if (config.refreshIntervalHours > 0) {
   setInterval(() => infrastructure.refresh().catch(() => undefined), config.refreshIntervalHours * 3.6e6).unref();
 }

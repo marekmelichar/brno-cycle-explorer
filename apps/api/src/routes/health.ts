@@ -5,7 +5,7 @@ import { MultiRoutingProvider } from '../adapters/routing/multi';
 
 const started = Date.now();
 
-export function registerHealthRoutes(app: FastifyInstance, { config, infrastructure, routing, geocoder }: AppDeps) {
+export function registerHealthRoutes(app: FastifyInstance, { config, infrastructure, routing, geocoder, stairs }: AppDeps) {
   app.get('/api/health', async (): Promise<HealthResponse> => {
     const meta = infrastructure.getMeta();
     return {
@@ -29,6 +29,7 @@ export function registerHealthRoutes(app: FastifyInstance, { config, infrastruct
       defaultEngine: routing instanceof MultiRoutingProvider ? routing.defaultEngine : null,
     },
     geocoding: { provider: geocoder ? 'nominatim' : 'none', available: !!geocoder, attribution: geocoder?.attribution ?? '' },
+    stairs: { available: stairs.available },
     infrastructureSource: config.arcgisLayerUrl,
   }));
 }

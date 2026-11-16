@@ -78,6 +78,18 @@ Web app for finding, viewing, analysing and planning bike routes in Brno. It use
 - **Example route**: Maloměřice → Náplavka → Riviéra → Anthropos → Maloměřice. The waypoints
   were geocoded with Nominatim (`packages/shared/src/example-route.ts`); the connected route is
   calculated at runtime.
+- **Stairs for downhill practice** ("Schody" tab): outdoor staircases from OpenStreetMap
+  (`highway=steps`). The API downloads every staircase in the Brno area from Overpass, tries the
+  endpoints in `OVERPASS_URLS` in order, caches the result and refreshes it every
+  `STAIRS_REFRESH_DAYS`. Flights that meet end to end are joined into one staircase, and their
+  step counts are added up. Filters: minimum number of steps; outdoor and public only (no tunnels,
+  underpasses, indoor or private stairs); hide `bicycle=no`. Sort by size or by distance from your
+  location. Details: step count, estimated drop (steps × 16 cm, labelled as an estimate), length,
+  surface, width, handrail, lighting, ramp, and the upper end when OSM has `incline`. Missing values
+  show as "not in OSM", never guessed. **"Naplánovat sem"** (Plan route here) makes the upper end
+  the destination and your location the start. If Overpass is unreachable, the tab falls back to the
+  stairs in the basemap tiles currently on screen, and says so (no step counts there)
+  (`packages/geo/src/stairs.ts`, `apps/api/src/services/stairs-service.ts`).
 - **Statistics**: length by category, both as recorded feature lengths **and** as the
   de-duplicated network length. Shows feature counts, length built per year (interactive stacked
   chart plus a table view), the export date, and coverage and limitations.
@@ -148,6 +160,9 @@ All settings are environment variables. See [.env.example](.env.example). Main o
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter` | Overpass endpoints for the stairs finder, tried in order (empty = off) |
+| `STAIRS_BBOX` | `16.45,49.12,16.75,49.3` | Area searched for stairs: minLon,minLat,maxLon,maxLat |
+| `STAIRS_REFRESH_DAYS` | `7` | Stairs data refresh interval |
 | `ARCGIS_LAYER_URL` | Brno FeatureServer layer 0 | Official data source |
 | `CACHE_DIR` | `./data-cache` | Dataset cache |
 | `DATA_REFRESH_INTERVAL_HOURS` | 24 | Automatic refresh |

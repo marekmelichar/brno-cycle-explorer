@@ -142,3 +142,17 @@ test.describe('mobile: shared link + my location', () => {
     await expect(page.locator('.bce-waypoint').first()).toHaveText('S');
   });
 });
+
+test('mobile: five tabs fit, and picking a staircase lowers the sheet to show it on the map', async ({ page }) => {
+  await page.goto('/');
+  await waitForMapReady(page);
+  for (const id of ['tab-map', 'tab-planner', 'tab-gpx', 'tab-stairs', 'tab-stats']) await expect(page.getByTestId(id)).toBeInViewport({ ratio: 1 });
+  await page.getByTestId('tab-stairs').click();
+  await page.evaluate(() => (window as any).__bceMap.jumpTo({ center: [16.6068, 49.1951], zoom: 15 }));
+  // tapping the tab opened the sheet to half; expand it fully
+  await page.getByRole('button', { name: 'Rozbalit panel', exact: true }).click();
+  await page.getByTestId('stair-item').first().click({ timeout: 60_000 });
+  const sheet = (await page.getByTestId('bottom-sheet').boundingBox())!;
+  expect(sheet.height).toBeLessThan(page.viewportSize()!.height * 0.6); // half, not full
+  await expect(page.getByTestId('stair-detail')).toBeInViewport();
+});
