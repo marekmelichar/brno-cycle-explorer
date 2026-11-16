@@ -116,4 +116,11 @@ describe('Overpass stairs', () => {
     await expect(svc.refresh()).rejects.toThrow();
     expect(svc.get().meta.nextRetryAt).toBeNull();
   });
+
+  it('reports why a server refused (text from its error page)', async () => {
+    const f = (async () =>
+      new Response('<html><head><title>502</title><style>p{}</style></head><body><p>Error: runtime error: rate_limited, try again later</p></body></html>', { status: 503 })) as unknown as typeof fetch;
+    const { svc } = await service(['https://a.test/api'], f);
+    await expect(svc.refresh()).rejects.toThrow('a.test: HTTP 503 (502 Error: runtime error: rate_limited, try again later)');
+  });
 });

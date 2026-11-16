@@ -42,7 +42,7 @@ export class OverpassClient {
           await new Promise((r) => setTimeout(r, this.opts.busyRetryDelayMs ?? 10_000));
           res = await post(url);
         }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}${await reason(res)}`);
         const json = (await res.json()) as { elements?: unknown[]; osm3s?: { timestamp_osm_base?: string }; remark?: string };
         if (!Array.isArray(json.elements)) throw new Error('neplatná odpověď');
         // Overpass reports a query timeout/out-of-memory as a 200 with a "remark" and partial data
@@ -56,6 +56,16 @@ export class OverpassClient {
     }
     throw new Error(`Služba Overpass (OpenStreetMap) není dostupná – ${errors.join('; ')}`);
   }
+}
+
+/**
+ * Why the server refused, from its error page: Overpass explains rate limits, blocks and overload
+ * in the body ("rate_limited", "Too many requests", …). Tags stripped, one short line.
+ */
+async function reason(res: Response): Promise<string> {
+  const text = await res.text().catch(() => '');
+  const line = text.replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  return line ? ` (${line})` : '';
 }
 
 /** Overpass QL for all `highway=steps` ways in a bbox, with node ids and geometry. */
