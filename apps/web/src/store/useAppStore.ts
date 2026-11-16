@@ -9,10 +9,20 @@ import {
   type RoutePreference,
   type RouteCandidate,
   type OsmInterval,
+  type Stair,
 } from '@bce/shared';
 import { DEFAULT_MATCH_OPTIONS, type GpxWarning, type MatchOptions, type TrackPoint } from '@bce/geo';
 
-export type SidebarTab = 'map' | 'planner' | 'gpx' | 'stats';
+export type SidebarTab = 'map' | 'planner' | 'gpx' | 'stats' | 'stairs';
+
+export interface StairFilters {
+  minSteps: number;
+  /** Hide indoor, underground, covered and private stairs. */
+  outdoorOnly: boolean;
+  /** Hide stairs tagged bicycle=no. */
+  hideNoBicycle: boolean;
+}
+export const DEFAULT_STAIR_FILTERS: StairFilters = { minSteps: 0, outdoorOnly: true, hideNoBicycle: false };
 export type PlannerMode = 'auto' | 'manual';
 
 export interface Waypoint {
@@ -21,6 +31,8 @@ export interface Waypoint {
   name: string;
   /** True while the name is automatic ("Bod N" or a looked-up street); false once the user typed one. */
   autoName?: boolean;
+  /** Placed from the device location ("My location"): a new location replaces it instead of adding a point. */
+  fromLocation?: boolean;
 }
 
 /** The route currently analysed and shown on the map. `kind` tells its provenance. */
@@ -89,8 +101,18 @@ interface State {
   selectedCandidateId: string | null;
   savedRoutes: SavedRoute[];
 
+  stairFilters: StairFilters;
+  stairSort: 'size' | 'distance';
+  /** Reference point for "nearest" sorting (device location or map centre). */
+  stairOrigin: { position: LngLat; fromLocation: boolean } | null;
+  selectedStairId: string | null;
+  /** Fallback stairs collected from the map tiles while Overpass data is unavailable. */
+  tileStairs: Stair[];
+
   fitRequest: { bounds: [number, number, number, number]; at: number } | null;
   settingsOpen: boolean;
+  /** Phone bottom sheet height. */
+  sheet: 'peek' | 'half' | 'full';
   sourcesOpen: boolean;
 
   set: (p: Partial<State>) => void;
@@ -98,6 +120,8 @@ interface State {
   toggleCategory: (c: InfraCategory) => void;
   setAllCategories: (v: boolean) => void;
   addWaypoint: (p: LngLat, name?: string) => void;
+  /** Sets the start to the device location: replaces an earlier location start, otherwise inserts a new first point. Returns its id. */
+  setLocationStart: (p: LngLat, name: string) => string;
   moveWaypoint: (id: string, p: LngLat) => void;
   removeWaypoint: (id: string) => void;
   reorderWaypoint: (from: number, to: number) => void;
@@ -141,8 +165,14 @@ export const useAppStore = create<State>()(
       candidates: [],
       selectedCandidateId: null,
       savedRoutes: [],
+      stairFilters: DEFAULT_STAIR_FILTERS,
+      stairSort: 'size',
+      stairOrigin: null,
+      selectedStairId: null,
+      tileStairs: [],
       fitRequest: null,
       settingsOpen: false,
+      sheet: 'peek',
       sourcesOpen: false,
 
       set: (p) => set(p),
@@ -157,6 +187,15 @@ export const useAppStore = create<State>()(
           selectedCandidateId: null,
           routeDirty: true,
         })),
+      setLocationStart: (p, name) => {
+        const id = newWaypointId();
+        set((s) => {
+          const wp: Waypoint = { id, position: p, name, autoName: true, fromLocation: true };
+          const rest = s.waypoints[0]?.fromLocation ? s.waypoints.slice(1) : s.waypoints;
+          return { waypoints: [wp, ...rest], candidates: [], selectedCandidateId: null, routeDirty: true };
+        });
+        return id;
+      },
       moveWaypoint: (id, p) =>
         set((s) => ({ waypoints: s.waypoints.map((w) => (w.id === id ? { ...w, position: p } : w)), candidates: [], selectedCandidateId: null, routeDirty: true })),
       removeWaypoint: (id) => set((s) => ({ waypoints: s.waypoints.filter((w) => w.id !== id), candidates: [], selectedCandidateId: null, routeDirty: true })),
@@ -201,6 +240,7 @@ export const useAppStore = create<State>()(
         engine: s.engine,
         targetKm: s.targetKm,
         savedRoutes: s.savedRoutes,
+        stairFilters: s.stairFilters,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
@@ -209,6 +249,7 @@ export const useAppStore = create<State>()(
           ...p,
           visibleCategories: { ...current.visibleCategories, ...(p.visibleCategories ?? {}) },
           matchOptions: { ...current.matchOptions, ...(p.matchOptions ?? {}) },
+          stairFilters: { ...current.stairFilters, ...(p.stairFilters ?? {}) },
         };
       },
     },

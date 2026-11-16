@@ -7,7 +7,11 @@ import { CATEGORIES, CATEGORY_ORDER, UNMATCHED_COLOR, categoryLabel, type InfraC
 import { useActiveAnalysis, useAppConfig, useInfrastructure } from '../../hooks/data';
 import { useAppStore } from '../../store/useAppStore';
 import { BRNO_CENTER } from '../../services/geometry';
-import { BLANK_STYLE, EMPTY_FC, INFRA_LAYER_IDS, ROUTE_LAYER_IDS, addOverlays, infraLayerId, setSourceData, type OverlayData } from './mapLayers';
+import { BLANK_STYLE, EMPTY_FC, INFRA_LAYER_IDS, ROUTE_LAYER_IDS, STAIRS_LAYER_IDS, addOverlays, infraLayerId, setSourceData, type OverlayData } from './mapLayers';
+import { stairsFromTiles, type TileStepFeature } from '@bce/geo';
+import type { LngLat } from '@bce/shared';
+import { useStairs, useStepsLabel } from '../../hooks/useStairs';
+import { setMapHandle } from '../../services/mapHandle';
 import { FeatureInspector } from './FeatureInspector';
 import { sectionLabel } from '../../services/osm';
 import i18n, { currentLang, useI18n } from '../../i18n';
@@ -18,6 +22,8 @@ import { RouteColorButton, SIMPLE_ROUTE_COLOR } from './RouteColorButton';
 type StyleStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; message?: string };
 
 const STYLE_TIMEOUT_MS = 15000;
+/** Zoom cap when fitting to one point: about 2 km across on a phone, so you can still see where you are. */
+const SINGLE_POINT_ZOOM = 15;
 
 async function fetchStyle(url: string): Promise<StyleSpecification> {
   let res: Response;
@@ -67,6 +73,9 @@ export function MapView() {
   const fitRequest = useAppStore((s) => s.fitRequest);
   const tab = useAppStore((s) => s.tab);
   const plannerMode = useAppStore((s) => s.plannerMode);
+  const stairsView = useStairs();
+  const selectedStairId = useAppStore((s) => s.selectedStairId);
+  const stepsLabel = useStepsLabel();
 
   const basemap = useMemo(() => {
     if (!config) return null;
@@ -87,7 +96,30 @@ export function MapView() {
         }
       : EMPTY_FC;
     const sel = analysis?.sections.find((s) => s.id === selectedSectionId);
+    const selStair = tab === 'stairs' ? stairsView.all.find((s) => s.id === selectedStairId) : undefined;
     return {
+      stairs:
+        tab === 'stairs'
+          ? {
+              type: 'FeatureCollection',
+              features: stairsView.list.flatMap(({ stair }) =>
+                stair.lines.map((line) => ({
+                  type: 'Feature' as const,
+                  properties: { id: stair.id, label: [stair.name, stepsLabel(stair) ?? i18n.t('stairs.stepsUnknown')].filter(Boolean).join(' · ') },
+                  geometry: { type: 'LineString' as const, coordinates: line },
+                })),
+              ),
+            }
+          : EMPTY_FC,
+      selectedStair: selStair
+        ? {
+            type: 'FeatureCollection',
+            features: [
+              ...selStair.lines.map((line) => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: line } })),
+              ...(selStair.top ? [{ type: 'Feature' as const, properties: {}, geometry: { type: 'Point' as const, coordinates: selStair.top } }] : []),
+            ],
+          }
+        : EMPTY_FC,
       infra: (infra?.data as unknown as GeoJSON.FeatureCollection) ?? EMPTY_FC,
       route,
       candidates: {
@@ -109,7 +141,7 @@ export function MapView() {
           ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: analysis.sections[0].coordinates[0] } }] }
           : EMPTY_FC,
     };
-  }, [analysis, activeRoute, infra, candidates, selectedCandidateId, manualLine, selectedSectionId, lang]);
+  }, [analysis, activeRoute, infra, candidates, selectedCandidateId, manualLine, selectedSectionId, lang, tab, stairsView.list, stairsView.all, selectedStairId, stepsLabel]);
   const overlayRef = useRef(overlay);
   overlayRef.current = overlay;
 
@@ -179,6 +211,7 @@ export function MapView() {
       cooperativeGestures: false,
     });
     mapRef.current = map;
+    setMapHandle(map);
     (window as unknown as { __bceMap?: MlMap }).__bceMap = map;
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
     map.addControl(
@@ -220,6 +253,7 @@ export function MapView() {
       ro.disconnect();
       map.remove();
       mapRef.current = null;
+      setMapHandle(null);
     };
   }, [applyLayerState]);
 
@@ -242,6 +276,41 @@ export function MapView() {
     setSourceData(map, 'bce-selected-section', overlay.selectedSection);
     setSourceData(map, 'bce-route-start', overlay.routeStart);
   }, [overlay.route, overlay.candidates, overlay.manual, overlay.selectedSection, overlay.routeStart, mapReady]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !map.getSource('bce-stairs')) return;
+    setSourceData(map, 'bce-stairs', overlay.stairs);
+    setSourceData(map, 'bce-stairs-selected', overlay.selectedStair);
+  }, [overlay.stairs, overlay.selectedStair, mapReady]);
+
+  // ---------- stairs fallback: collect highway=steps from the basemap tiles while OSM data is missing ----------
+  const tilePiecesRef = useRef(new Map<string, TileStepFeature>());
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || tab !== 'stairs' || stairsView.mode !== 'tiles') return;
+    const collect = () => {
+      if (!map.getSource('openmaptiles')) return;
+      const pieces = tilePiecesRef.current;
+      const before = pieces.size;
+      for (const f of map.querySourceFeatures('openmaptiles', { sourceLayer: 'transportation', filter: ['==', ['get', 'subclass'], 'steps'] })) {
+        const g = f.geometry;
+        const lines = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+        for (const c of lines) {
+          if (c.length < 2 || pieces.size >= 20000) continue;
+          const coords = c.map((p) => [Number(p[0].toFixed(6)), Number(p[1].toFixed(6))] as LngLat);
+          pieces.set(coords.map((p) => p.join(',')).join(';'), { coordinates: coords, properties: f.properties ?? {} });
+        }
+      }
+      if (pieces.size !== before || useAppStore.getState().tileStairs.length === 0) {
+        useAppStore.getState().set({ tileStairs: stairsFromTiles([...pieces.values()]) });
+      }
+    };
+    collect();
+    map.on('idle', collect);
+    return () => {
+      map.off('idle', collect);
+    };
+  }, [tab, stairsView.mode, mapReady]);
 
   useEffect(applyLayerState, [visible, showInfra, opacity, overlayOpacity, routeColorMode, selectedFeatureId, mapReady, applyLayerState]);
 
@@ -275,12 +344,14 @@ export function MapView() {
     if (!map || !fitRequest) return;
     const [a, b, c, d] = fitRequest.bounds;
     const mobile = window.innerWidth < 900;
+    // a single point (e.g. "my location" alone): street level, but keep the neighbourhood in view
+    const single = a === c && b === d;
     map.fitBounds(
       [
         [a, b],
         [c, d],
       ],
-      { padding: mobile ? { top: 70, bottom: window.innerHeight * 0.45, left: 30, right: 30 } : 60, maxZoom: 16, duration: 700 },
+      { padding: mobile ? { top: 70, bottom: window.innerHeight * 0.45, left: 30, right: 30 } : 60, maxZoom: single ? SINGLE_POINT_ZOOM : 16, duration: 700 },
     );
   }, [fitRequest]);
 
@@ -292,6 +363,11 @@ export function MapView() {
 
     const onClick = (e: maplibregl.MapMouseEvent) => {
       const s = useAppStore.getState();
+      if (s.tab === 'stairs') {
+        const hit = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: queryLayers(STAIRS_LAYER_IDS) });
+        if (hit.length) s.set({ selectedStairId: String(hit[0].properties.id) });
+        return;
+      }
       if (s.tab === 'planner') {
         const p: [number, number] = [Number(e.lngLat.lng.toFixed(6)), Number(e.lngLat.lat.toFixed(6))];
         if (s.plannerMode === 'auto') {
@@ -324,6 +400,13 @@ export function MapView() {
 
     const onMove = (e: maplibregl.MapMouseEvent) => {
       const s = useAppStore.getState();
+      if (s.tab === 'stairs') {
+        const hit = map.queryRenderedFeatures([[e.point.x - 6, e.point.y - 6], [e.point.x + 6, e.point.y + 6]], { layers: queryLayers(STAIRS_LAYER_IDS) });
+        map.getCanvas().style.cursor = hit.length ? 'pointer' : '';
+        setHover(null);
+        setHoverInfo(hit.length ? { x: e.point.x, y: e.point.y, label: i18n.t('stairs.hover', { info: hit[0].properties.label }) } : null);
+        return;
+      }
       if (s.tab === 'planner') {
         map.getCanvas().style.cursor = 'crosshair';
         setHover(null);

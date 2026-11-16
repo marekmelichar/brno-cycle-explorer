@@ -11,6 +11,8 @@ import { NoRoutingProvider } from '../src/adapters/routing/types';
 import { ValhallaProvider, variantsFor } from '../src/adapters/routing/valhalla';
 import { NominatimGeocoder } from '../src/adapters/geocoding/nominatim';
 import { mockArcGis, silentLog } from './mock-arcgis';
+import { OverpassClient } from '../src/adapters/osm/overpass-client';
+import { StairsService } from '../src/services/stairs-service';
 
 async function app(opts: { routing?: 'none' | 'valhalla'; valhallaFetch?: typeof fetch } = {}) {
   const config = loadConfig({ CACHE_DIR: await mkdtemp(path.join(os.tmpdir(), 'bce-')) } as NodeJS.ProcessEnv);
@@ -26,7 +28,8 @@ async function app(opts: { routing?: 'none' | 'valhalla'; valhallaFetch?: typeof
       ? new Response(JSON.stringify({ display_name: 'Karlova, Maloměřice, Brno', address: { road: 'Karlova', suburb: 'Maloměřice', city: 'Brno' } }))
       : new Response(JSON.stringify([{ osm_type: 'way', osm_id: 1, display_name: 'Karlova, Brno', lat: '49.21', lon: '16.64', type: 'primary', boundingbox: ['49.2', '49.22', '16.63', '16.65'] }])),
   );
-  return { server: await buildApp({ config, infrastructure, routing, geocoder }, { logger: false }), infrastructure };
+  const stairs = new StairsService(new OverpassClient([], { timeoutMs: 1000, userAgent: 'test' }), new FileCache(config.cacheDir, 'stairs'), config.stairsBbox, silentLog);
+  return { server: await buildApp({ config, infrastructure, routing, geocoder, stairs }, { logger: false }), infrastructure };
 }
 
 describe('REST API', () => {

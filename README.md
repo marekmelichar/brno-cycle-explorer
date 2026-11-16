@@ -64,9 +64,32 @@ Web app for finding, viewing, analysing and planning bike routes in Brno. It use
   The app scores every candidate by matched infrastructure, distance and climb, and lets you
   compare them. Manual drawing is clearly labelled "nenavigovaná trasa" (not a navigable route).
   You can import a GPX as a starting point, export GPX, and save routes in the browser.
+- **Share a route link:** "Sdílet odkaz" (Share link) puts the plan into the URL: the points
+  (5 decimals ≈ 1 m), their names, ride type, preference, engine, and round trip with its loop
+  length, e.g. `?wp=16.6,49.195;16.612,49.2&n=Start|Cíl&ride=ebike`. It sends the plan, not the
+  geometry: whoever opens the link gets the route recalculated on the current network. Phones open
+  the system share sheet; desktops copy the link. Invalid links are ignored, and the parameters are
+  removed from the address bar after loading (`packages/shared/src/share-link.ts`).
+- **Start from my location:** the location button next to the planner search makes the device
+  position the start (high accuracy, 15 s timeout). Pressing it again replaces that start instead of
+  adding a point, and the point is named after the nearest street. Blocked access, no signal and
+  timeouts each show their own message. Needs HTTPS; production allows it via
+  `Permissions-Policy: geolocation=(self)`.
 - **Example route**: Maloměřice → Náplavka → Riviéra → Anthropos → Maloměřice. The waypoints
   were geocoded with Nominatim (`packages/shared/src/example-route.ts`); the connected route is
   calculated at runtime.
+- **Stairs for downhill practice** ("Schody" tab): outdoor staircases from OpenStreetMap
+  (`highway=steps`). The API downloads every staircase in the Brno area from Overpass, tries the
+  endpoints in `OVERPASS_URLS` in order, caches the result and refreshes it every
+  `STAIRS_REFRESH_DAYS`. Flights that meet end to end are joined into one staircase, and their
+  step counts are added up. Filters: minimum number of steps; outdoor and public only (no tunnels,
+  underpasses, indoor or private stairs); hide `bicycle=no`. Sort by size or by distance from your
+  location. Details: step count, estimated drop (steps × 16 cm, labelled as an estimate), length,
+  surface, width, handrail, lighting, ramp, and the upper end when OSM has `incline`. Missing values
+  show as "not in OSM", never guessed. **"Naplánovat sem"** (Plan route here) makes the upper end
+  the destination and your location the start. If Overpass is unreachable, the tab falls back to the
+  stairs in the basemap tiles currently on screen, and says so (no step counts there)
+  (`packages/geo/src/stairs.ts`, `apps/api/src/services/stairs-service.ts`).
 - **Statistics**: length by category, both as recorded feature lengths **and** as the
   de-duplicated network length. Shows feature counts, length built per year (interactive stacked
   chart plus a table view), the export date, and coverage and limitations.
@@ -137,6 +160,9 @@ All settings are environment variables. See [.env.example](.env.example). Main o
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `OVERPASS_URLS` | `https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter` | Overpass endpoints for the stairs finder, tried in order (empty = off) |
+| `STAIRS_BBOX` | `16.45,49.12,16.75,49.3` | Area searched for stairs: minLon,minLat,maxLon,maxLat |
+| `STAIRS_REFRESH_DAYS` | `7` | Stairs data refresh interval |
 | `ARCGIS_LAYER_URL` | Brno FeatureServer layer 0 | Official data source |
 | `CACHE_DIR` | `./data-cache` | Dataset cache |
 | `DATA_REFRESH_INTERVAL_HOURS` | 24 | Automatic refresh |

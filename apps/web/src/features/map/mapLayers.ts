@@ -13,6 +13,8 @@ export const BLANK_STYLE: StyleSpecification = {
 export const infraLayerId = (c: InfraCategory) => `bce-infra-${c}`;
 export const INFRA_LAYER_IDS = CATEGORY_ORDER.map(infraLayerId);
 export const ROUTE_LAYER_IDS = ['bce-route-matched', 'bce-route-unmatched'];
+export const STAIRS_LAYER_IDS = ['bce-stairs', 'bce-stairs-casing'];
+export const STAIRS_COLOR = '#d21fd2';
 
 export interface OverlayData {
   infra: GeoJSON.FeatureCollection;
@@ -22,6 +24,10 @@ export interface OverlayData {
   selectedSection: GeoJSON.FeatureCollection;
   /** Start point of the active route (first coordinate). */
   routeStart: GeoJSON.FeatureCollection;
+  /** Stairs shown in the Stairs tab (empty elsewhere). */
+  stairs: GeoJSON.FeatureCollection;
+  /** Selected staircase: its lines plus a Point at the upper end (when known). */
+  selectedStair: GeoJSON.FeatureCollection;
 }
 
 const ARROW_IMAGE = 'bce-arrow';
@@ -65,6 +71,8 @@ export function addOverlays(map: MlMap, data: OverlayData) {
   src('bce-manual', data.manual);
   src('bce-selected-section', data.selectedSection);
   src('bce-route-start', data.routeStart);
+  src('bce-stairs', data.stairs);
+  src('bce-stairs-selected', data.selectedStair);
   // Images are part of the style: re-add after every basemap switch.
   if (!map.hasImage(ARROW_IMAGE)) map.addImage(ARROW_IMAGE, createArrowImage(), { pixelRatio: 2 });
 
@@ -140,6 +148,37 @@ export function addOverlays(map: MlMap, data: OverlayData) {
     filter: ['==', ['get', 'id'], -1],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': '#22d3ee', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 5, 14, 9, 17, 14], 'line-opacity': 0.75 },
+  });
+
+  // Stairs: wide dark casing + magenta line with short dashes (reads as steps); selected = white halo
+  add({
+    id: 'bce-stairs-selected-halo',
+    type: 'line',
+    source: 'bce-stairs-selected',
+    filter: ['==', ['geometry-type'], 'LineString'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 10, 17, 22], 'line-opacity': 0.9 },
+  });
+  add({
+    id: 'bce-stairs-casing',
+    type: 'line',
+    source: 'bce-stairs',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#0b1220', 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 6, 17, 14], 'line-opacity': 0.8 },
+  });
+  add({
+    id: 'bce-stairs',
+    type: 'line',
+    source: 'bce-stairs',
+    layout: { 'line-cap': 'butt', 'line-join': 'round' },
+    paint: { 'line-color': STAIRS_COLOR, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 4, 17, 10], 'line-dasharray': [0.6, 0.35] },
+  });
+  add({
+    id: 'bce-stairs-top',
+    type: 'circle',
+    source: 'bce-stairs-selected',
+    filter: ['==', ['geometry-type'], 'Point'],
+    paint: { 'circle-radius': 7, 'circle-color': '#16a34a', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2.5 },
   });
 
   add({

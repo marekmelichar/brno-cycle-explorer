@@ -22,7 +22,9 @@ When you start a new cloud session, select the environment **`brno-cycle-explore
 | Host | Used by | What breaks without it |
 |---|---|---|
 | `services6.arcgis.com` | API | No cycling data. `/api/health` reports `degraded` with `featureCount: 0`. |
-| `valhalla1.openstreetmap.de` | API | Route planner returns errors. |
+| `brouter.de` | API | The default engine (BRouter) fails; only Valhalla routes. |
+| `valhalla1.openstreetmap.de` | API | Valhalla routes fail. |
+| `overpass-api.de`, `overpass.private.coffee` | API | Stairs tab falls back to stairs from the map tiles (no step counts). **Note:** on 2026-11-16 both refused connections from the cloud session even when allowed (TLS reset / timeout), so in a cloud session the tab normally shows the fallback. |
 | `nominatim.openstreetmap.org` | API | Address search returns nothing. |
 | `tiles.openfreemap.org` | Browser | Grey map with the message "Mapový podklad se nepodařilo načíst" (cycling layers still render). |
 
@@ -73,7 +75,7 @@ setting, and point Playwright at the pre-installed Chromium:
 PW_CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:e2e
 ```
 
-Tested in a cloud session on 2026-11-14: 56/56 unit tests and 5/5 e2e tests passed.
+Tested in a cloud session on 2026-11-16: 101/101 unit tests and 21/21 e2e tests passed.
 
 ## Troubleshooting
 

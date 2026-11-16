@@ -111,3 +111,48 @@ test('mobile: a dropped connection while routing shows a retry, and recovers', a
   await toast.getByRole('button', { name: 'Zkusit znovu' }).click();
   await expect(page.getByTestId('planner-status')).toContainText(/\d+,\d km/, { timeout: 90_000 });
 });
+
+test.describe('mobile: shared link + my location', () => {
+  test.use({ permissions: ['geolocation'], geolocation: { latitude: 49.2003, longitude: 16.6081 } });
+
+  test('a shared link opens the planner with a share button in the action bar', async ({ page }) => {
+    const errors = collectConsoleErrors(page);
+    await page.goto('/?wp=16.6,49.195;16.612,49.2&n=Start|C%C3%ADl');
+    await waitForMapReady(page);
+    const cfg = await page.evaluate(() => fetch('/api/config').then((r) => r.json()));
+    test.skip(!cfg.routing.available, 'routing not configured');
+    await expect(page.getByTestId('tab-planner')).toHaveAttribute('aria-selected', 'true');
+    await page.getByRole('button', { name: 'Rozbalit panel', exact: true }).click();
+    await expect(page.getByTestId('planner-status')).toContainText(/\d+,\d km/, { timeout: 90_000 });
+    // all action-bar buttons fit on a phone screen
+    for (const id of ['calculate-route', 'planner-share-icon']) await expect(page.getByTestId(id)).toBeInViewport();
+    const bar = (await page.getByTestId('planner-actions').boundingBox())!;
+    expect(bar.x + bar.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+    await page.mouse.move(5, 5); // no leftover hover tooltip in the screenshot
+    await page.screenshot({ path: 'tests/screenshots/mobile-shared-route.png' });
+    expect(errors).toEqual([]);
+  });
+
+  test('"my location" button sets the start', async ({ page }) => {
+    await page.goto('/');
+    await waitForMapReady(page);
+    await page.getByTestId('tab-planner').click();
+    await page.getByTestId('location-start').click();
+    await expect(page.getByTestId('waypoint-list').locator('li')).toHaveCount(1);
+    await expect(page.locator('.bce-waypoint').first()).toHaveText('S');
+  });
+});
+
+test('mobile: five tabs fit, and picking a staircase lowers the sheet to show it on the map', async ({ page }) => {
+  await page.goto('/');
+  await waitForMapReady(page);
+  for (const id of ['tab-map', 'tab-planner', 'tab-gpx', 'tab-stairs', 'tab-stats']) await expect(page.getByTestId(id)).toBeInViewport({ ratio: 1 });
+  await page.getByTestId('tab-stairs').click();
+  await page.evaluate(() => (window as any).__bceMap.jumpTo({ center: [16.6068, 49.1951], zoom: 15 }));
+  // tapping the tab opened the sheet to half; expand it fully
+  await page.getByRole('button', { name: 'Rozbalit panel', exact: true }).click();
+  await page.getByTestId('stair-item').first().click({ timeout: 60_000 });
+  const sheet = (await page.getByTestId('bottom-sheet').boundingBox())!;
+  expect(sheet.height).toBeLessThan(page.viewportSize()!.height * 0.6); // half, not full
+  await expect(page.getByTestId('stair-detail')).toBeInViewport();
+});

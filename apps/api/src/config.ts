@@ -20,6 +20,12 @@ export interface ApiConfig {
   geocoderUserAgent: string;
   geocoderEnabled: boolean;
   corsOrigin: string | boolean;
+  /** Overpass endpoints tried in order (first that answers wins); empty = stairs finder off. */
+  overpassUrls: string[];
+  overpassTimeoutMs: number;
+  /** Area searched for stairs: [minLon, minLat, maxLon, maxLat]. */
+  stairsBbox: [number, number, number, number];
+  stairsRefreshDays: number;
   basemaps: BasemapStyle[];
   defaultBasemap: string;
   version: string;
@@ -80,9 +86,24 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     geocoderUrl: (env.GEOCODER_URL ?? 'https://nominatim.openstreetmap.org').replace(/\/$/, ''),
     geocoderUserAgent: env.GEOCODER_USER_AGENT ?? 'BrnoCycleExplorer/1.0 (self-hosted open-source app)',
     geocoderEnabled: env.GEOCODER_ENABLED !== 'false',
+    overpassUrls: (env.OVERPASS_URLS ?? 'https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter')
+      .split(',')
+      .map((u) => u.trim().replace(/\/$/, ''))
+      .filter(Boolean),
+    overpassTimeoutMs: num(env.OVERPASS_TIMEOUT_MS, 90000),
+    stairsBbox: parseBbox(env.STAIRS_BBOX) ?? [16.45, 49.12, 16.75, 49.3],
+    stairsRefreshDays: num(env.STAIRS_REFRESH_DAYS, 7),
     corsOrigin: cors === undefined || cors === '' ? true : cors === 'false' ? false : cors,
     basemaps,
     defaultBasemap: env.DEFAULT_BASEMAP && basemaps.some((b) => b.id === env.DEFAULT_BASEMAP) ? env.DEFAULT_BASEMAP : basemaps[0].id,
     version: env.APP_VERSION ?? '1.0.0',
   };
+}
+
+/** "minLon,minLat,maxLon,maxLat" → bbox, or null when invalid. */
+function parseBbox(v: string | undefined): [number, number, number, number] | null {
+  if (!v) return null;
+  const b = v.split(',').map(Number);
+  if (b.length !== 4 || b.some((x) => !Number.isFinite(x)) || b[0] >= b[2] || b[1] >= b[3]) return null;
+  return b as [number, number, number, number];
 }

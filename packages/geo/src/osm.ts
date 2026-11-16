@@ -84,6 +84,8 @@ const SURFACE_EN: Record<string, string> = {
   dirt: 'dirt',
   grass: 'grass',
   wood: 'wood',
+  stone: 'stone',
+  metal: 'metal',
 };
 
 const SURFACE: Record<string, string> = {
@@ -102,7 +104,12 @@ const SURFACE: Record<string, string> = {
   dirt: 'hlína',
   grass: 'tráva',
   wood: 'dřevo',
+  stone: 'kámen',
+  metal: 'kov',
 };
+
+/** OSM surface value in the UI language (unknown values are shown as they are). */
+export const surfaceLabel = (surface: string, lang: 'cs' | 'en') => (lang === 'en' ? SURFACE_EN : SURFACE)[surface] ?? surface;
 
 /** Short Czech description of an OSM way, e.g. "klidná ulice (obytná / zóna), asfalt, max 30 km/h". */
 export function describeOsm(tags: Record<string, string>, lang: Lang = 'cs'): string {

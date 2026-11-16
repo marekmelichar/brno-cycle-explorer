@@ -1,4 +1,4 @@
-import type { AppConfig, GeocodeResult, InfrastructureResponse, RouteRequest, RouteResponse } from '@bce/shared';
+import type { AppConfig, GeocodeResult, InfrastructureResponse, RouteRequest, RouteResponse, StairsResponse } from '@bce/shared';
 
 import type { TFunction } from 'i18next';
 import { currentLang } from '../i18n';
@@ -54,6 +54,7 @@ export const api = {
       body: JSON.stringify(req),
       timeoutMs: 120000,
     }),
+  stairs: () => request<StairsResponse>('/api/stairs', { timeoutMs: 30000 }),
   reverseGeocode: (lat: number, lon: number) =>
     request<{ label: string }>(`/api/geocode/reverse?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`, { timeoutMs: 20000 }),
   /** viewbox = [minLon, minLat, maxLon, maxLat] of the visible map: results nearby rank first (search is worldwide). */

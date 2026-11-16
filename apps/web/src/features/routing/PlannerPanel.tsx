@@ -36,6 +36,8 @@ import SaveIcon from '@mui/icons-material/Save';
 import DownloadIcon from '@mui/icons-material/Download';
 import ClearAllIcon from '@mui/icons-material/ClearAll';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
+import ShareIcon from '@mui/icons-material/Share';
 import { EXAMPLE_ROUTE, type RideType, type RouteCandidate, type RoutePreference, type RouteResponse } from '@bce/shared';
 import { analyzeRoute, elevationStats, scoreRoute, type RouteAnalysis, type RouteScore } from '@bce/geo';
 import { api, ApiError, apiErrorText } from '../../services/api';
@@ -47,6 +49,7 @@ import { GroupBar, RouteStats } from '../../components/RouteStats';
 import { useNotify } from '../../components/Notifier';
 import { useI18n } from '../../i18n';
 import { useExportGpx } from '../../hooks/useRouteActions';
+import { useCanSharePlan, useLocationStart, useSharePlan } from '../../hooks/usePlanSharing';
 import { fmtDistance, fmtDuration, fmtKm, fmtPct } from '../../services/format';
 import { unverifiedOsmBreakdown } from '../../services/osm';
 import { linesBounds } from '../../services/geometry';
@@ -76,6 +79,9 @@ export function PlannerPanel() {
   const notify = useNotify();
   const { t, lang } = useI18n();
   const exportGpx = useExportGpx();
+  const sharePlan = useSharePlan();
+  const canShare = useCanSharePlan();
+  const locationStart = useLocationStart();
   const { data: config } = useAppConfig();
   const index = useInfraIndex();
   const routingAvailable = !!config?.routing.available;
@@ -298,7 +304,18 @@ export function PlannerPanel() {
               </Select>
             </FormControl>
           </Stack>
-          <SearchBox placeholder={t('planner.addSearch')} onSelect={(r) => s.addWaypoint([r.lon, r.lat], r.label.split(',').slice(0, 2).join(','))} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <SearchBox placeholder={t('planner.addSearch')} onSelect={(r) => s.addWaypoint([r.lon, r.lat], r.label.split(',').slice(0, 2).join(','))} />
+            </Box>
+            <Tooltip title={locationStart.locating ? t('planner.locating') : t('planner.myLocationTip')}>
+              <span>
+                <IconButton aria-label={t('planner.myLocationTip')} onClick={locationStart.start} disabled={locationStart.locating} data-testid="location-start">
+                  {locationStart.locating ? <CircularProgress size={20} /> : <MyLocationIcon />}
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Box>
           <Box>
             <Typography variant="overline" color="text.secondary">
               {t('planner.points')}
@@ -453,6 +470,13 @@ export function PlannerPanel() {
           <Button size="small" startIcon={<SaveIcon />} onClick={saveCurrent}>
             {t('planner.save')}
           </Button>
+          {canShare && (
+            <Tooltip title={t('planner.shareTip')}>
+              <Button size="small" startIcon={<ShareIcon />} onClick={sharePlan} data-testid="planner-share">
+                {t('planner.share')}
+              </Button>
+            </Tooltip>
+          )}
         </Stack>
       )}
 
@@ -578,6 +602,13 @@ export function PlannerPanel() {
               </IconButton>
             </span>
           </Tooltip>
+          {canShare && (
+            <Tooltip title={t('planner.shareTip')}>
+              <IconButton aria-label={t('planner.share')} onClick={sharePlan} data-testid="planner-share-icon">
+                <ShareIcon />
+              </IconButton>
+            </Tooltip>
+          )}
           {s.activeRoute && s.activeRoute.kind !== 'gpx' && (
             <Tooltip title={t('planner.export')}>
               <IconButton aria-label={t('planner.exportGpx')} onClick={exportGpx}>

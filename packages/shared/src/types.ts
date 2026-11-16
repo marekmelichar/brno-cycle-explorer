@@ -101,6 +101,8 @@ export interface AppConfig {
     defaultEngine: string | null;
   };
   geocoding: { provider: string; available: boolean; attribution: string };
+  /** Stairs finder (OSM via Overpass). */
+  stairs: { available: boolean };
   infrastructureSource: string;
 }
 
@@ -170,4 +172,55 @@ export interface HealthResponse {
   version: string;
   dataset: { featureCount: number; lastRefreshed: string | null; lastError: string | null };
   routing: { provider: string; available: boolean };
+}
+
+/** A staircase from OpenStreetMap (highway=steps), possibly joined from several connected flights. */
+export interface Stair {
+  /** "osm:123" or "osm:123+456" (joined flights); "tile:…" for map-tile fallback data. */
+  id: string;
+  /** OSM way ids (empty for tile data). */
+  osmIds: number[];
+  name: string | null;
+  /** Ordered from one end to the other; `lines[0][0]` is the start of the chain. */
+  lines: LngLat[][];
+  length: number;
+  /** Sum of `step_count` over all flights; null when no flight has it. */
+  stepCount: number | null;
+  /** Some flights lack `step_count`, so `stepCount` is a lower bound. */
+  stepCountPartial: boolean;
+  /** Estimated height drop (m) from the step count (~16 cm per step); null without a step count. */
+  drop: number | null;
+  /** Upper/lower end, known only from OSM `incline` (up/down); null when OSM does not say. */
+  top: LngLat | null;
+  bottom: LngLat | null;
+  surface: string | null;
+  /** Narrowest flight width (m). */
+  width: number | null;
+  handrail: boolean | null;
+  lit: boolean | null;
+  /** A ramp/wheel channel (ramp:bicycle, ramp:stroller, ramp=yes). */
+  ramp: boolean | null;
+  /** OSM `bicycle` tag of any flight that sets it (no beats yes). */
+  bicycle: string | null;
+  /** Indoor, in a tunnel/underpass, covered or below ground. */
+  sheltered: boolean;
+  /** access/foot = private or no. */
+  restricted: boolean;
+}
+
+export interface StairsMeta {
+  source: 'overpass' | 'none';
+  /** Overpass endpoint that served the data. */
+  sourceUrl: string | null;
+  count: number;
+  lastRefreshed: string | null;
+  /** OSM data timestamp reported by Overpass. */
+  osmTimestamp: string | null;
+  lastError: { message: string; at: string } | null;
+  refreshing: boolean;
+}
+
+export interface StairsResponse {
+  meta: StairsMeta;
+  stairs: Stair[];
 }

@@ -4,6 +4,7 @@ import MapIcon from '@mui/icons-material/Map';
 import RouteIcon from '@mui/icons-material/Route';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import StairsIcon from '@mui/icons-material/Stairs';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TopBar } from './components/TopBar';
@@ -14,17 +15,20 @@ import { PlannerPanel } from './features/routing/PlannerPanel';
 import { GpxPanel } from './features/gpx/GpxPanel';
 import { AnalysisPanel } from './features/gpx/AnalysisPanel';
 import { StatsPanel } from './features/analytics/StatsPanel';
+import { StairsPanel } from './features/stairs/StairsPanel';
 import { SettingsDialog } from './components/SettingsDialog';
 import { SourcesDialog } from './components/SourcesDialog';
 import { useAppStore, type SidebarTab } from './store/useAppStore';
 import { useGpxImport } from './hooks/useRouteActions';
 import { useActiveAnalysis } from './hooks/data';
 import { RouteSummaryBar } from './components/RouteSummaryBar';
+import { useSharedPlanImport } from './hooks/usePlanSharing';
 
 const TABS: Array<{ id: SidebarTab; label: string; short: string; icon: ReactNode }> = [
   { id: 'map', label: 'tabs.map', short: 'tabs.mapShort', icon: <MapIcon fontSize="small" /> },
   { id: 'planner', label: 'tabs.planner', short: 'tabs.plannerShort', icon: <RouteIcon fontSize="small" /> },
   { id: 'gpx', label: 'tabs.gpx', short: 'tabs.gpxShort', icon: <TimelineIcon fontSize="small" /> },
+  { id: 'stairs', label: 'tabs.stairs', short: 'tabs.stairsShort', icon: <StairsIcon fontSize="small" /> },
   { id: 'stats', label: 'tabs.stats', short: 'tabs.statsShort', icon: <BarChartIcon fontSize="small" /> },
 ];
 
@@ -35,6 +39,7 @@ function TabContent({ tab }: { tab: SidebarTab }) {
       {tab === 'planner' && <PlannerPanel />}
       {tab === 'gpx' && <GpxPanel />}
       {tab === 'stats' && <StatsPanel />}
+      {tab === 'stairs' && <StairsPanel />}
     </>
   );
 }
@@ -61,7 +66,8 @@ function SidebarTabs({ compact }: { compact?: boolean }) {
           id={`tab-${t.id}`}
           aria-controls="sidebar-panel"
           data-testid={`tab-${t.id}`}
-          sx={compact ? { gap: 0.5, fontSize: 12, minHeight: 48, "& .MuiTab-iconWrapper": { mr: 0 } } : { gap: 0.25, fontSize: 11.5, lineHeight: 1.2, minHeight: 58, py: 0.75, "& .MuiTab-iconWrapper": { mb: 0.25 } }}
+          // 5 tabs on a 360–412 px phone: drop MUI's 90 px minimum width
+          sx={compact ? { gap: 0.5, fontSize: 12, minHeight: 48, minWidth: 0, px: 0.5, "& .MuiTab-iconWrapper": { mr: 0 } } : { gap: 0.25, fontSize: 11.5, lineHeight: 1.2, minHeight: 58, py: 0.75, "& .MuiTab-iconWrapper": { mb: 0.25 } }}
         />
       ))}
     </Tabs>
@@ -106,7 +112,8 @@ export function App() {
   const { t } = useI18n();
   const desktop = useMediaQuery('(min-width:900px)');
   const tab = useAppStore((s) => s.tab);
-  const [sheet, setSheet] = useState<'peek' | 'half' | 'full'>('peek');
+  const sheet = useAppStore((s) => s.sheet);
+  const setSheet = (v: 'peek' | 'half' | 'full') => useAppStore.getState().set({ sheet: v });
   const hasSummary = !!useActiveAnalysis();
   // collapsed sheet = handle (30) + tabs (48) [+ route summary (44)]
   const peekHeight = hasSummary ? 122 : 78;
@@ -115,6 +122,7 @@ export function App() {
     document.documentElement.style.setProperty('--bce-sheet-peek', `${peekHeight}px`);
   }, [peekHeight]);
   const drop = useWindowDrop();
+  useSharedPlanImport();
 
   return (
     <Box sx={{ height: '100dvh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default', overflow: 'hidden' }}>
